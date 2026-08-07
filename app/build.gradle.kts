@@ -43,7 +43,7 @@ tasks.named<Test>("test") {
 
 spotless {
     format("misc") {
-        target("**/*.gradle.kts", "**/.gitignore")
+        target("**/*.gradle.kts", "**/.gitignore", "**/*.toml")
         trimTrailingWhitespace()
         leadingTabsToSpaces()
         endWithNewline()

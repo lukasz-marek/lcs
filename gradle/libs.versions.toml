@@ -14,8 +14,8 @@ spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter",
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test", version.ref = "spring-boot" }
 jspecify = { module = "org.jspecify:jspecify", version.ref = "jspecify" }
 errorprone = { module = "com.google.errorprone:error_prone_core", version.ref = "errorprone" }
-nullaway = {module = "com.uber.nullaway:nullaway", version.ref = "nullaway"}
-archunit = {module = "com.tngtech.archunit:archunit-junit6", version.ref="archunit"}
+nullaway = { module = "com.uber.nullaway:nullaway", version.ref = "nullaway" }
+archunit = { module = "com.tngtech.archunit:archunit-junit6", version.ref = "archunit" }
 
 [plugins]
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
