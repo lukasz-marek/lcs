@@ -3,10 +3,12 @@
 [versions]
 spring-boot = "4.1.0"
 spotless = "8.9.0"
+jspecify = "1.0.0"
 
 [libraries]
 spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter", version.ref = "spring-boot" }
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test", version.ref = "spring-boot" }
+jspecify ={ module = "org.jspecify:jspecify", version.ref = "jspecify" }
 
 [plugins]
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
