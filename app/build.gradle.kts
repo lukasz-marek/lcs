@@ -19,6 +19,10 @@ dependencies {
     testImplementation(libs.archunit)
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
+    // immutables
+    annotationProcessor(libs.immutables.annotation.processor)
+    compileOnly(libs.immutables.annotations)
+
     // errorprone
     errorprone(libs.errorprone)
     errorprone(libs.nullaway)
