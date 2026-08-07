@@ -31,3 +31,6 @@ build
 
 # Ignore Kotlin plugin data
 .kotlin
+
+# IntelliJ IDEA stuff
+.idea
