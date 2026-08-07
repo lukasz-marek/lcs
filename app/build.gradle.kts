@@ -33,7 +33,7 @@ java {
 
 application {
     // Define the main class for the application.
-    mainClass = "org.example.App"
+    mainClass = "lmarek.lcs.App"
 }
 
 tasks.named<Test>("test") {
