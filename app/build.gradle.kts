@@ -1,6 +1,10 @@
+import net.ltgt.gradle.errorprone.CheckSeverity
+import net.ltgt.gradle.errorprone.errorprone
+
 plugins {
     application
     alias(libs.plugins.spotless)
+    alias(libs.plugins.errorprone)
 }
 
 repositories {
@@ -13,6 +17,10 @@ dependencies {
 
     testImplementation(libs.spring.boot.starter.test)
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    // errorprone
+    errorprone(libs.errorprone)
+    errorprone(libs.nullaway)
 }
 
 // Apply a specific Java toolchain to ease working on different environments.
@@ -49,7 +57,19 @@ spotless {
         jackson()
     }
     yaml {
-        target("src/**/*.yaml","src/**/*.yml")
+        target("src/**/*.yaml", "src/**/*.yml")
         jackson()
+    }
+}
+
+tasks.withType<JavaCompile> {
+    options.errorprone {
+        check("NullAway", CheckSeverity.ERROR)
+        option("NullAway:OnlyNullMarked", true)
+        if (name.lowercase().contains("test")) {
+            options.errorprone {
+                disable("NullAway")
+            }
+        }
     }
 }
