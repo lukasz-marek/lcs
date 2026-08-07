@@ -7,6 +7,7 @@ jspecify = "1.0.0"
 errorprone-plugin = "5.1.0"
 errorprone = "2.50.0"
 nullaway = "0.13.8"
+archunit = "1.5.0"
 
 [libraries]
 spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter", version.ref = "spring-boot" }
@@ -14,6 +15,7 @@ spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-star
 jspecify = { module = "org.jspecify:jspecify", version.ref = "jspecify" }
 errorprone = { module = "com.google.errorprone:error_prone_core", version.ref = "errorprone" }
 nullaway = {module = "com.uber.nullaway:nullaway", version.ref = "nullaway"}
+archunit = {module = "com.tngtech.archunit:archunit-junit6", version.ref="archunit"}
 
 [plugins]
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
