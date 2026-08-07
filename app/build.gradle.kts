@@ -1,6 +1,6 @@
 plugins {
-    // Apply the application plugin to add support for building a CLI application in Java.
     application
+    alias(libs.plugins.spotless)
 }
 
 repositories {
@@ -29,4 +29,26 @@ application {
 tasks.named<Test>("test") {
     // Use JUnit Platform for unit tests.
     useJUnitPlatform()
+}
+
+spotless {
+    format("misc") {
+        target("**/*.gradle.kts", "**/.gitignore")
+        trimTrailingWhitespace()
+        leadingTabsToSpaces()
+        endWithNewline()
+    }
+    java {
+        removeUnusedImports()
+        expandWildcardImports()
+        googleJavaFormat()
+    }
+    json {
+        target("src/**/*.json")
+        jackson()
+    }
+    yaml {
+        target("src/**/*.yaml","src/**/*.yml")
+        jackson()
+    }
 }
