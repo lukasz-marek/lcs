@@ -1,4 +1,4 @@
-package lmarek.lcs.classifier.rule;
+package lmarek.lcs.classifier.rule.symbol;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;

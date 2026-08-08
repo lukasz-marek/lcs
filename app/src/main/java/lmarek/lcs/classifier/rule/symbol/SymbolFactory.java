@@ -1,4 +1,4 @@
-package lmarek.lcs.classifier.rule;
+package lmarek.lcs.classifier.rule.symbol;
 
 import com.google.common.collect.MapMaker;
 import java.util.Map;
