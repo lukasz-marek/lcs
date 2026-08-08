@@ -1,7 +1,7 @@
 package lmarek.lcs;
 
-import lmarek.lcs.classifier.rule.symbol.Symbol;
-import lmarek.lcs.classifier.rule.symbol.SymbolFactory;
+import lmarek.lcs.classifier.symbol.Symbol;
+import lmarek.lcs.classifier.symbol.SymbolFactory;
 
 public final class SymbolMother {
   private SymbolMother() {}

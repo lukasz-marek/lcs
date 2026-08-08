@@ -1,6 +1,6 @@
 package lmarek.lcs.classifier.rule;
 
-import lmarek.lcs.classifier.rule.symbol.Symbol;
+import lmarek.lcs.classifier.symbol.Symbol;
 
 public record AnySymbol() implements Matcher {
   @Override

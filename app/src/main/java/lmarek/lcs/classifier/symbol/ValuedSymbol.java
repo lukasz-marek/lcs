@@ -1,4 +1,4 @@
-package lmarek.lcs.classifier.rule.symbol;
+package lmarek.lcs.classifier.symbol;
 
 import java.util.function.Predicate;
 import java.util.regex.Pattern;

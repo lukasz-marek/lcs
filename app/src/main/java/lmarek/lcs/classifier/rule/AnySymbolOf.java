@@ -1,7 +1,7 @@
 package lmarek.lcs.classifier.rule;
 
 import java.util.Set;
-import lmarek.lcs.classifier.rule.symbol.Symbol;
+import lmarek.lcs.classifier.symbol.Symbol;
 
 public record AnySymbolOf(Set<Symbol> allowedValues) implements Matcher {
   public AnySymbolOf {
