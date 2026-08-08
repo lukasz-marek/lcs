@@ -8,7 +8,7 @@ import org.immutables.value.Value;
 @Value.Style(
     overshadowImplementation = true,
     visibility = Value.Style.ImplementationVisibility.PRIVATE)
-public abstract class Rule {
+public abstract class LearnedRule {
   abstract List<Matcher> matchers();
 
   abstract Symbol prediction();
