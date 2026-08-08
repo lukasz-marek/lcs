@@ -9,6 +9,7 @@ errorprone = "2.50.0"
 nullaway = "0.13.8"
 archunit = "1.5.0"
 immutables = "2.12.2"
+guava = "33.6.0-jre"
 
 [libraries]
 spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter", version.ref = "spring-boot" }
@@ -19,6 +20,7 @@ nullaway = { module = "com.uber.nullaway:nullaway", version.ref = "nullaway" }
 archunit = { module = "com.tngtech.archunit:archunit-junit6", version.ref = "archunit" }
 immutables-annotation-processor = { module = "org.immutables:value", version.ref = "immutables" }
 immutables-annotations = { module = "org.immutables:value-annotations", version.ref = "immutables" }
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
 
 [plugins]
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }

@@ -14,6 +14,7 @@ repositories {
 dependencies {
     implementation(libs.spring.boot.starter)
     implementation(libs.jspecify)
+    implementation(libs.guava)
 
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.archunit)
