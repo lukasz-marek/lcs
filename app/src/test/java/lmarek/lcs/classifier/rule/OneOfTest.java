@@ -1,7 +1,6 @@
 package lmarek.lcs.classifier.rule;
 
-import static lmarek.lcs.SymbolMother.symbol;
-
+import lmarek.lcs.classifier.symbol.Symbol;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -12,9 +11,9 @@ class OneOfTest {
   @ValueSource(strings = {"red", "green", "blue"})
   void allowedValuesMatch(String tested) {
     // given
-    var sut = new OneOf(symbol("red"), symbol("green"), symbol("blue"));
+    var sut = new OneOf(Symbol.of("red"), Symbol.of("green"), Symbol.of("blue"));
     // when
-    var matches = sut.matches(symbol(tested));
+    var matches = sut.matches(Symbol.of(tested));
     // then
     Assertions.assertThat(matches).isTrue();
   }
@@ -23,9 +22,9 @@ class OneOfTest {
   @ValueSource(strings = {"red", "green", "blue"})
   void nonAllowedValuesDoNotMatch(String tested) {
     // given
-    var sut = new OneOf(symbol("black"), symbol("white"));
+    var sut = new OneOf(Symbol.of("black"), Symbol.of("white"));
     // when
-    var matches = sut.matches(symbol(tested));
+    var matches = sut.matches(Symbol.of(tested));
     // then
     Assertions.assertThat(matches).isFalse();
   }

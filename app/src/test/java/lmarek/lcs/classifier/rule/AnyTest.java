@@ -1,6 +1,6 @@
 package lmarek.lcs.classifier.rule;
 
-import lmarek.lcs.SymbolMother;
+import lmarek.lcs.classifier.symbol.Symbol;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -13,7 +13,7 @@ class AnyTest {
     var sut = new Any();
 
     // when
-    var matches = sut.matches(SymbolMother.symbol(tested));
+    var matches = sut.matches(Symbol.of(tested));
 
     // then
     Assertions.assertThat(matches).isTrue();

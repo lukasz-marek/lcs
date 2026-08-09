@@ -1,6 +1,5 @@
 package lmarek.lcs.classifier.rule;
 
-import static lmarek.lcs.SymbolMother.symbol;
 import static lmarek.lcs.classifier.rule.Matcher.any;
 import static lmarek.lcs.classifier.rule.Matcher.oneOf;
 
@@ -15,66 +14,71 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 class LearnedRuleTest {
 
-  public static final Symbol PREDICTION = symbol("white");
+  public static final Symbol PREDICTION = Symbol.of("white");
 
   static Stream<Arguments> matchingExamples() {
     var builder = Stream.<Arguments>builder();
     // use of any
     builder.accept(
         Arguments.of(
-            List.of(any(), any(), any()), List.of(symbol("red"), symbol("red"), symbol("red"))));
+            List.of(any(), any(), any()),
+            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
     builder.accept(
         Arguments.of(
-            List.of(oneOf(symbol("red")), any(), any()),
-            List.of(symbol("red"), symbol("red"), symbol("red"))));
+            List.of(oneOf(Symbol.of("red")), any(), any()),
+            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
     builder.accept(
         Arguments.of(
-            List.of(oneOf(symbol("red")), oneOf(symbol("red")), any()),
-            List.of(symbol("red"), symbol("red"), symbol("red"))));
+            List.of(oneOf(Symbol.of("red")), oneOf(Symbol.of("red")), any()),
+            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
     builder.accept(
         Arguments.of(
-            List.of(oneOf(symbol("red")), oneOf(symbol("red")), oneOf(symbol("red"))),
-            List.of(symbol("red"), symbol("red"), symbol("red"))));
+            List.of(oneOf(Symbol.of("red")), oneOf(Symbol.of("red")), oneOf(Symbol.of("red"))),
+            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
     // multiple symbols matched
     builder.accept(
         Arguments.of(
             List.of(
-                oneOf(symbol("red"), symbol("green")), oneOf(symbol("red")), oneOf(symbol("red"))),
-            List.of(symbol("red"), symbol("red"), symbol("red"))));
+                oneOf(Symbol.of("red"), Symbol.of("green")),
+                oneOf(Symbol.of("red")),
+                oneOf(Symbol.of("red"))),
+            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
     builder.accept(
         Arguments.of(
             List.of(
-                oneOf(symbol("red"), symbol("green")),
-                oneOf(symbol("red"), symbol("green")),
-                oneOf(symbol("red"))),
-            List.of(symbol("red"), symbol("red"), symbol("red"))));
+                oneOf(Symbol.of("red"), Symbol.of("green")),
+                oneOf(Symbol.of("red"), Symbol.of("green")),
+                oneOf(Symbol.of("red"))),
+            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
     builder.accept(
         Arguments.of(
             List.of(
-                oneOf(symbol("red"), symbol("green")),
-                oneOf(symbol("red"), symbol("green")),
-                oneOf(symbol("red"), symbol("green"))),
-            List.of(symbol("red"), symbol("red"), symbol("red"))));
+                oneOf(Symbol.of("red"), Symbol.of("green")),
+                oneOf(Symbol.of("red"), Symbol.of("green")),
+                oneOf(Symbol.of("red"), Symbol.of("green"))),
+            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
     // mixed symbols in sample
     builder.accept(
         Arguments.of(
             List.of(
-                oneOf(symbol("red"), symbol("green")), oneOf(symbol("red")), oneOf(symbol("red"))),
-            List.of(symbol("green"), symbol("red"), symbol("red"))));
+                oneOf(Symbol.of("red"), Symbol.of("green")),
+                oneOf(Symbol.of("red")),
+                oneOf(Symbol.of("red"))),
+            List.of(Symbol.of("green"), Symbol.of("red"), Symbol.of("red"))));
     builder.accept(
         Arguments.of(
             List.of(
-                oneOf(symbol("red"), symbol("green")),
-                oneOf(symbol("red"), symbol("green")),
-                oneOf(symbol("red"))),
-            List.of(symbol("green"), symbol("green"), symbol("red"))));
+                oneOf(Symbol.of("red"), Symbol.of("green")),
+                oneOf(Symbol.of("red"), Symbol.of("green")),
+                oneOf(Symbol.of("red"))),
+            List.of(Symbol.of("green"), Symbol.of("green"), Symbol.of("red"))));
     builder.accept(
         Arguments.of(
             List.of(
-                oneOf(symbol("red"), symbol("green")),
-                oneOf(symbol("red"), symbol("green")),
-                oneOf(symbol("red"), symbol("green"))),
-            List.of(symbol("green"), symbol("green"), symbol("green"))));
+                oneOf(Symbol.of("red"), Symbol.of("green")),
+                oneOf(Symbol.of("red"), Symbol.of("green")),
+                oneOf(Symbol.of("red"), Symbol.of("green"))),
+            List.of(Symbol.of("green"), Symbol.of("green"), Symbol.of("green"))));
     return builder.build();
   }
 
@@ -83,44 +87,46 @@ class LearnedRuleTest {
     // use of any
     builder.accept(
         Arguments.of(
-            List.of(any(), oneOf(symbol("red")), oneOf(symbol("green"))),
-            List.of(symbol("red"), symbol("red"), symbol("red"))));
+            List.of(any(), oneOf(Symbol.of("red")), oneOf(Symbol.of("green"))),
+            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
     builder.accept(
         Arguments.of(
-            List.of(oneOf(symbol("green")), any(), any()),
-            List.of(symbol("red"), symbol("red"), symbol("red"))));
+            List.of(oneOf(Symbol.of("green")), any(), any()),
+            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
     builder.accept(
         Arguments.of(
-            List.of(oneOf(symbol("green")), oneOf(symbol("red")), any()),
-            List.of(symbol("red"), symbol("red"), symbol("red"))));
+            List.of(oneOf(Symbol.of("green")), oneOf(Symbol.of("red")), any()),
+            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
     builder.accept(
         Arguments.of(
-            List.of(oneOf(symbol("red")), oneOf(symbol("green")), oneOf(symbol("red"))),
-            List.of(symbol("red"), symbol("red"), symbol("red"))));
+            List.of(oneOf(Symbol.of("red")), oneOf(Symbol.of("green")), oneOf(Symbol.of("red"))),
+            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
     builder.accept(
         Arguments.of(
-            List.of(oneOf(symbol("red")), oneOf(symbol("red")), oneOf(symbol("green"))),
-            List.of(symbol("red"), symbol("red"), symbol("red"))));
+            List.of(oneOf(Symbol.of("red")), oneOf(Symbol.of("red")), oneOf(Symbol.of("green"))),
+            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
     // multiple symbols matched
     builder.accept(
         Arguments.of(
             List.of(
-                oneOf(symbol("red"), symbol("green")), oneOf(symbol("red")), oneOf(symbol("red"))),
-            List.of(symbol("red"), symbol("red"), symbol("blue"))));
+                oneOf(Symbol.of("red"), Symbol.of("green")),
+                oneOf(Symbol.of("red")),
+                oneOf(Symbol.of("red"))),
+            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("blue"))));
     builder.accept(
         Arguments.of(
             List.of(
-                oneOf(symbol("red"), symbol("green")),
-                oneOf(symbol("red"), symbol("green")),
-                oneOf(symbol("red"))),
-            List.of(symbol("blue"), symbol("blue"), symbol("red"))));
+                oneOf(Symbol.of("red"), Symbol.of("green")),
+                oneOf(Symbol.of("red"), Symbol.of("green")),
+                oneOf(Symbol.of("red"))),
+            List.of(Symbol.of("blue"), Symbol.of("blue"), Symbol.of("red"))));
     builder.accept(
         Arguments.of(
             List.of(
-                oneOf(symbol("red"), symbol("green")),
-                oneOf(symbol("red"), symbol("green")),
-                oneOf(symbol("red"), symbol("green"))),
-            List.of(symbol("blue"), symbol("blue"), symbol("blue"))));
+                oneOf(Symbol.of("red"), Symbol.of("green")),
+                oneOf(Symbol.of("red"), Symbol.of("green")),
+                oneOf(Symbol.of("red"), Symbol.of("green"))),
+            List.of(Symbol.of("blue"), Symbol.of("blue"), Symbol.of("blue"))));
     return builder.build();
   }
 
@@ -157,7 +163,7 @@ class LearnedRuleTest {
     // given
     var sut =
         new LearnedRuleBuilder().prediction(PREDICTION).addMatchers(any(), any(), any()).build();
-    var sample = new SampleData(symbol("red"));
+    var sample = new SampleData(Symbol.of("red"));
 
     // when / then
     Assertions.assertThatThrownBy(() -> sut.matches(sample))
