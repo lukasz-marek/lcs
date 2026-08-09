@@ -5,12 +5,12 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-class AnySymbolTest {
+class AnyTest {
   @ParameterizedTest
   @ValueSource(strings = {"red", "green", "blue"})
   void allSymbolsMatch(String tested) {
     // given
-    var sut = new AnySymbol();
+    var sut = new Any();
 
     // when
     var matches = sut.matches(SymbolMother.symbol(tested));

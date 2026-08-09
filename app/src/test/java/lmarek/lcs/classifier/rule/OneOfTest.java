@@ -6,13 +6,13 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-class AnyOfTest {
+class OneOfTest {
 
   @ParameterizedTest
   @ValueSource(strings = {"red", "green", "blue"})
   void allowedValuesMatch(String tested) {
     // given
-    var sut = new AnySymbolOf(symbol("red"), symbol("green"), symbol("blue"));
+    var sut = new OneOf(symbol("red"), symbol("green"), symbol("blue"));
     // when
     var matches = sut.matches(symbol(tested));
     // then
@@ -23,7 +23,7 @@ class AnyOfTest {
   @ValueSource(strings = {"red", "green", "blue"})
   void nonAllowedValuesDoNotMatch(String tested) {
     // given
-    var sut = new AnySymbolOf(symbol("black"), symbol("white"));
+    var sut = new OneOf(symbol("black"), symbol("white"));
     // when
     var matches = sut.matches(symbol(tested));
     // then

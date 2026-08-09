@@ -3,12 +3,12 @@ package lmarek.lcs.classifier.rule;
 import java.util.Set;
 import lmarek.lcs.classifier.symbol.Symbol;
 
-public record AnySymbolOf(Set<Symbol> allowedValues) implements Matcher {
-  public AnySymbolOf {
+record OneOf(Set<Symbol> allowedValues) implements Matcher {
+  public OneOf {
     allowedValues = Set.copyOf(allowedValues);
   }
 
-  public AnySymbolOf(Symbol... allowedValues) {
+  public OneOf(Symbol... allowedValues) {
     this(Set.of(allowedValues));
   }
 
