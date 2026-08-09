@@ -55,7 +55,7 @@ spotless {
     }
     java {
         removeUnusedImports()
-        expandWildcardImports()
+        forbidWildcardImports()
         googleJavaFormat()
     }
     json {
