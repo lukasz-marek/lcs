@@ -1,6 +1,7 @@
 package lmarek.lcs.classifier.rule;
 
 import java.util.List;
+import java.util.stream.IntStream;
 import lmarek.lcs.classifier.symbol.Symbol;
 import org.immutables.value.Value;
 
@@ -11,10 +12,10 @@ import org.immutables.value.Value;
 public abstract class LearnedRule {
   abstract List<Matcher> matchers();
 
-  abstract Symbol prediction();
+  public abstract Symbol prediction();
 
-  // todo
   public boolean matches(SampleData sampleData) {
-    throw new UnsupportedOperationException();
+    return IntStream.range(0, matchers().size())
+        .allMatch(index -> matchers().get(index).matches(sampleData.values().get(index)));
   }
 }
