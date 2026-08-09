@@ -1,4 +1,4 @@
-package lmarek.lcs.classifier.rule;
+package lmarek.lcs.classifier.data;
 
 import java.util.List;
 import lmarek.lcs.classifier.symbol.Symbol;

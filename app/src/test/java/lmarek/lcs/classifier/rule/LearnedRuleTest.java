@@ -5,6 +5,7 @@ import static lmarek.lcs.classifier.rule.Matcher.oneOf;
 
 import java.util.List;
 import java.util.stream.Stream;
+import lmarek.lcs.classifier.data.SampleData;
 import lmarek.lcs.classifier.symbol.Symbol;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;

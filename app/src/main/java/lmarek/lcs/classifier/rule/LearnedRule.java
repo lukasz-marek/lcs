@@ -2,6 +2,7 @@ package lmarek.lcs.classifier.rule;
 
 import java.util.List;
 import java.util.stream.IntStream;
+import lmarek.lcs.classifier.data.SampleData;
 import lmarek.lcs.classifier.symbol.Symbol;
 import org.immutables.value.Value;
 
