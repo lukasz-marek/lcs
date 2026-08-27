@@ -1,7 +1,12 @@
-package lmarek.lcs.classifier.rule;
+package lmarek.lcs.classifier.learning;
 
 import java.util.List;
 import java.util.Map;
+import lmarek.lcs.classifier.rule.Action;
+import lmarek.lcs.classifier.rule.Classifier;
+import lmarek.lcs.classifier.rule.ClassifierBuilder;
+import lmarek.lcs.classifier.rule.Condition;
+import lmarek.lcs.classifier.rule.Matcher;
 import lmarek.lcs.classifier.symbol.Symbol;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
