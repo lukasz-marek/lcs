@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.stream.Stream;
-import lmarek.lcs.classifier.data.Sample;
 import lmarek.lcs.classifier.data.SampleData;
 import lmarek.lcs.classifier.rule.Action;
 import lmarek.lcs.classifier.rule.Any;
@@ -22,17 +21,14 @@ class CoveringServiceTest {
   @Test
   void shouldGenerateExactRuleWhenGeneralizationIsDisabled() {
     // given
-    var sample =
-        new Sample(
-            new SampleData(Stream.of("I", "want", "exact", "match").map(Symbol::of).toList()),
-            new Action(Symbol.of("OK")));
+    var sample = new SampleData(Stream.of("I", "want", "exact", "match").map(Symbol::of).toList());
     var sut = new CoveringService(0);
     // when
 
-    var rule = sut.generateClassifier(sample, LEARNING_METADATA);
+    var rule = sut.generateClassifier(sample, new Action(Symbol.of("OK")), LEARNING_METADATA);
 
     // then
-    assertThat(rule.matches(sample.data())).isTrue(); // ensure that logic is correct
+    assertThat(rule.matches(sample)).isTrue(); // ensure that logic is correct
     assertThat(rule.metadata().timestamp()).isEqualTo(LEARNING_METADATA.iteration());
     assertThat(rule.condition().matchers())
         .allSatisfy(matcher -> assertThat(matcher).isInstanceOf(OneOf.class));
@@ -41,17 +37,14 @@ class CoveringServiceTest {
   @Test
   void shouldGenerateRuleMatchingAllWhenGeneralizationProbabilityIs100Percent() {
     // given
-    var sample =
-        new Sample(
-            new SampleData(Stream.of("I", "want", "exact", "match").map(Symbol::of).toList()),
-            new Action(Symbol.of("OK")));
+    var sample = new SampleData(Stream.of("I", "want", "exact", "match").map(Symbol::of).toList());
     var sut = new CoveringService(1);
     // when
 
-    var rule = sut.generateClassifier(sample, LEARNING_METADATA);
+    var rule = sut.generateClassifier(sample, new Action(Symbol.of("OK")), LEARNING_METADATA);
 
     // then
-    assertThat(rule.matches(sample.data())).isTrue(); // ensure that logic is correct
+    assertThat(rule.matches(sample)).isTrue(); // ensure that logic is correct
     assertThat(rule.metadata().timestamp()).isEqualTo(LEARNING_METADATA.iteration());
     assertThat(rule.condition().matchers())
         .allSatisfy(matcher -> assertThat(matcher).isInstanceOf(Any.class));

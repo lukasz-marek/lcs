@@ -1,7 +1,8 @@
 package lmarek.lcs.classifier.learning;
 
 import java.util.concurrent.ThreadLocalRandom;
-import lmarek.lcs.classifier.data.Sample;
+import lmarek.lcs.classifier.data.SampleData;
+import lmarek.lcs.classifier.rule.Action;
 import lmarek.lcs.classifier.rule.Classifier;
 import lmarek.lcs.classifier.rule.ClassifierBuilder;
 import lmarek.lcs.classifier.rule.Condition;
@@ -22,12 +23,12 @@ public class CoveringService {
     this.generalizationProbability = generalizationProbability;
   }
 
-  public Classifier generateClassifier(Sample sample, LearningMetadata learningMetadata) {
-    var condition =
-        new Condition(sample.data().values().stream().map(this::randomMatcherFor).toList());
+  public Classifier generateClassifier(
+      SampleData sample, Action allowedAction, LearningMetadata learningMetadata) {
+    var condition = new Condition(sample.values().stream().map(this::randomMatcherFor).toList());
     return new ClassifierBuilder()
         .condition(condition)
-        .action(sample.action())
+        .action(allowedAction)
         .metadata(Classifier.Metadata.defaults(learningMetadata.iteration()))
         .build();
   }
