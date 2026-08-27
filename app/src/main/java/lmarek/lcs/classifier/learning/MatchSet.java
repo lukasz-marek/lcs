@@ -15,10 +15,10 @@ import org.immutables.value.Value;
 @Value.Style(
     overshadowImplementation = true,
     visibility = Value.Style.ImplementationVisibility.PRIVATE)
-public interface MatchSet {
-  List<Classifier> classifiers();
+public abstract class MatchSet {
+  abstract List<Classifier> classifiers();
 
-  default Map<Action, Collection<Classifier>> classifiersByPrediction() {
+  Map<Action, Collection<Classifier>> classifiersByPrediction() {
     return classifiers().stream()
         .collect(groupingBy(Classifier::action, toCollection(ArrayList::new)));
   }
