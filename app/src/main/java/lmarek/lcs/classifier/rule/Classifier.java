@@ -1,7 +1,5 @@
 package lmarek.lcs.classifier.rule;
 
-import java.util.List;
-import java.util.stream.IntStream;
 import lmarek.lcs.classifier.data.SampleData;
 import lmarek.lcs.classifier.symbol.Symbol;
 import org.immutables.value.Value;
@@ -11,21 +9,11 @@ import org.immutables.value.Value;
     overshadowImplementation = true,
     visibility = Value.Style.ImplementationVisibility.PRIVATE)
 public abstract class Classifier {
-  abstract List<Matcher> matchers();
+  abstract Condition condition();
 
   public abstract Symbol prediction();
 
   public boolean matches(SampleData sampleData) {
-    checkCompatibility(sampleData);
-    return IntStream.range(0, matchers().size())
-        .allMatch(index -> matchers().get(index).matches(sampleData.values().get(index)));
-  }
-
-  private void checkCompatibility(SampleData sampleData) {
-    if (sampleData.values().size() != matchers().size()) {
-      throw new IllegalArgumentException(
-          "Cant match sample with %d attributes against rule with %d matchers"
-              .formatted(sampleData.values().size(), matchers().size()));
-    }
+    return condition().matches(sampleData);
   }
 }

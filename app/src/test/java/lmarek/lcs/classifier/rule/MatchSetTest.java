@@ -7,8 +7,8 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class MatchSetTest {
-  private static final Matcher MATCH_GREEN = Matcher.oneOf(Symbol.of("green"));
-  private static final Matcher MATCH_BLUE = Matcher.oneOf(Symbol.of("blue"));
+  private static final Condition MATCH_GREEN = new Condition(Matcher.oneOf(Symbol.of("green")));
+  private static final Condition MATCH_BLUE = new Condition(Matcher.oneOf(Symbol.of("blue")));
   private static final Symbol PREDICTION_RED = Symbol.of("red");
   private static final Symbol PREDICTION_YELLOW = Symbol.of("yellow");
 
@@ -17,8 +17,8 @@ class MatchSetTest {
     // given
     var allRules =
         List.of(
-            new ClassifierBuilder().addMatchers(MATCH_GREEN).prediction(PREDICTION_RED).build(),
-            new ClassifierBuilder().addMatchers(MATCH_BLUE).prediction(PREDICTION_YELLOW).build());
+            new ClassifierBuilder().condition(MATCH_GREEN).prediction(PREDICTION_RED).build(),
+            new ClassifierBuilder().condition(MATCH_BLUE).prediction(PREDICTION_YELLOW).build());
     // when
     var built = new MatchSetBuilder().addAllClassifiers(allRules).build();
 
@@ -31,8 +31,8 @@ class MatchSetTest {
     // given
     var allRules =
         List.of(
-            new ClassifierBuilder().addMatchers(MATCH_GREEN).prediction(PREDICTION_RED).build(),
-            new ClassifierBuilder().addMatchers(MATCH_BLUE).prediction(PREDICTION_YELLOW).build());
+            new ClassifierBuilder().condition(MATCH_GREEN).prediction(PREDICTION_RED).build(),
+            new ClassifierBuilder().condition(MATCH_BLUE).prediction(PREDICTION_YELLOW).build());
     var sut = new MatchSetBuilder().addAllClassifiers(allRules).build();
     var expected =
         Map.of(
@@ -50,8 +50,8 @@ class MatchSetTest {
     // given
     var allRules =
         List.of(
-            new ClassifierBuilder().addMatchers(MATCH_GREEN).prediction(PREDICTION_YELLOW).build(),
-            new ClassifierBuilder().addMatchers(MATCH_BLUE).prediction(PREDICTION_YELLOW).build());
+            new ClassifierBuilder().condition(MATCH_GREEN).prediction(PREDICTION_YELLOW).build(),
+            new ClassifierBuilder().condition(MATCH_BLUE).prediction(PREDICTION_YELLOW).build());
     var sut = new MatchSetBuilder().addAllClassifiers(allRules).build();
     var expected = Map.of(PREDICTION_YELLOW, allRules);
 

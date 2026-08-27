@@ -28,7 +28,7 @@ class CoveringServiceTest {
 
     // then
     assertThat(rule.matches(sample.data())).isTrue(); // ensure that logic is correct
-    assertThat(rule.matchers())
+    assertThat(rule.condition().matchers())
         .allSatisfy(matcher -> assertThat(matcher).isInstanceOf(OneOf.class));
   }
 
@@ -46,7 +46,8 @@ class CoveringServiceTest {
 
     // then
     assertThat(rule.matches(sample.data())).isTrue(); // ensure that logic is correct
-    assertThat(rule.matchers()).allSatisfy(matcher -> assertThat(matcher).isInstanceOf(Any.class));
+    assertThat(rule.condition().matchers())
+        .allSatisfy(matcher -> assertThat(matcher).isInstanceOf(Any.class));
   }
 
   @ParameterizedTest

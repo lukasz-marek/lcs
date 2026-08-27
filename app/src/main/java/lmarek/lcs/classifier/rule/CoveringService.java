@@ -19,8 +19,9 @@ public class CoveringService {
   }
 
   public Classifier generateClassifier(Sample sample) {
-    var matchers = sample.data().values().stream().map(this::randomMatcherFor).toList();
-    return new ClassifierBuilder().matchers(matchers).prediction(sample.action()).build();
+    var condition =
+        new Condition(sample.data().values().stream().map(this::randomMatcherFor).toList());
+    return new ClassifierBuilder().condition(condition).prediction(sample.action()).build();
   }
 
   private Matcher randomMatcherFor(Symbol symbol) {
