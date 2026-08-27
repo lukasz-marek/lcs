@@ -10,7 +10,7 @@ import org.immutables.value.Value;
 @Value.Style(
     overshadowImplementation = true,
     visibility = Value.Style.ImplementationVisibility.PRIVATE)
-public abstract class MatchableRule {
+public abstract class Classifier {
   abstract List<Matcher> matchers();
 
   public abstract Symbol prediction();

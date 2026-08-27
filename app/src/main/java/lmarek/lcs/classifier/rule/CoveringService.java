@@ -7,10 +7,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
-public class CoveringRuleService {
+public class CoveringService {
   private final double generalizationProbability;
 
-  public CoveringRuleService(
+  public CoveringService(
       @Value("${learning.generalization.probability}") double generalizationProbability) {
     if (generalizationProbability < 0 || generalizationProbability > 1) {
       throw new IllegalArgumentException("probability must be between 0 and 1");
@@ -18,9 +18,9 @@ public class CoveringRuleService {
     this.generalizationProbability = generalizationProbability;
   }
 
-  public MatchableRule generateCoveringRule(Sample sample) {
+  public Classifier generateClassifier(Sample sample) {
     var matchers = sample.data().values().stream().map(this::randomMatcherFor).toList();
-    return new MatchableRuleBuilder().matchers(matchers).prediction(sample.action()).build();
+    return new ClassifierBuilder().matchers(matchers).prediction(sample.action()).build();
   }
 
   private Matcher randomMatcherFor(Symbol symbol) {

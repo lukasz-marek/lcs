@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-class CoveringRuleServiceTest {
+class CoveringServiceTest {
 
   @Test
   void shouldGenerateExactRuleWhenGeneralizationIsDisabled() {
@@ -21,10 +21,10 @@ class CoveringRuleServiceTest {
         new Sample(
             new SampleData(Stream.of("I", "want", "exact", "match").map(Symbol::of).toList()),
             Symbol.of("OK"));
-    var sut = new CoveringRuleService(0);
+    var sut = new CoveringService(0);
     // when
 
-    var rule = sut.generateCoveringRule(sample);
+    var rule = sut.generateClassifier(sample);
 
     // then
     assertThat(rule.matches(sample.data())).isTrue(); // ensure that logic is correct
@@ -39,10 +39,10 @@ class CoveringRuleServiceTest {
         new Sample(
             new SampleData(Stream.of("I", "want", "exact", "match").map(Symbol::of).toList()),
             Symbol.of("OK"));
-    var sut = new CoveringRuleService(1);
+    var sut = new CoveringService(1);
     // when
 
-    var rule = sut.generateCoveringRule(sample);
+    var rule = sut.generateClassifier(sample);
 
     // then
     assertThat(rule.matches(sample.data())).isTrue(); // ensure that logic is correct
@@ -52,13 +52,13 @@ class CoveringRuleServiceTest {
   @ParameterizedTest
   @ValueSource(doubles = {-1, -0.1, 1.001, 20, 100})
   void shouldThrowWhenProbabilityIsOutOfRange(double probability) {
-    assertThatThrownBy(() -> new CoveringRuleService(probability))
+    assertThatThrownBy(() -> new CoveringService(probability))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @ParameterizedTest
   @ValueSource(doubles = {0, 0.001, 0.1, 0.5, 0.9, 0.999, 1})
   void shouldAllowValidProbabilities(double probability) {
-    assertThatCode(() -> new CoveringRuleService(probability)).doesNotThrowAnyException();
+    assertThatCode(() -> new CoveringService(probability)).doesNotThrowAnyException();
   }
 }
