@@ -50,4 +50,27 @@ class MatchSetTest {
     // then
     Assertions.assertThat(result).isEqualTo(expected);
   }
+
+  @Test
+  void groupsRulesByPredictionWithDuplicatePredictions() {
+    // given
+    var allRules =
+        List.of(
+            new MatchableRuleBuilder()
+                .addMatchers(MATCH_GREEN)
+                .prediction(PREDICTION_YELLOW)
+                .build(),
+            new MatchableRuleBuilder()
+                .addMatchers(MATCH_BLUE)
+                .prediction(PREDICTION_YELLOW)
+                .build());
+    var sut = new MatchSetBuilder().addAllRules(allRules).build();
+    var expected = Map.of(PREDICTION_YELLOW, allRules);
+
+    // when
+    var result = sut.rulesByPrediction();
+
+    // then
+    Assertions.assertThat(result).isEqualTo(expected);
+  }
 }
