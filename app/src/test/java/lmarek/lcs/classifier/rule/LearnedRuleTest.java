@@ -135,7 +135,12 @@ class LearnedRuleTest {
   @MethodSource("matchingExamples")
   void shouldMatchSamples(List<Matcher> matchers, List<Symbol> sampleData) {
     // given
-    var sut = new ClassifierBuilder().condition(new Condition(matchers)).action(ACTION).build();
+    var sut =
+        new ClassifierBuilder()
+            .condition(new Condition(matchers))
+            .action(ACTION)
+            .metadata(Classifier.Metadata.defaults(0))
+            .build();
     var sample = new SampleData(sampleData);
 
     // when
@@ -149,7 +154,12 @@ class LearnedRuleTest {
   @MethodSource("nonMatchingExamples")
   void shouldNotMatchSamples(List<Matcher> matchers, List<Symbol> sampleData) {
     // given
-    var sut = new ClassifierBuilder().condition(new Condition(matchers)).action(ACTION).build();
+    var sut =
+        new ClassifierBuilder()
+            .condition(new Condition(matchers))
+            .action(ACTION)
+            .metadata(Classifier.Metadata.defaults(0))
+            .build();
     var sample = new SampleData(sampleData);
 
     // when
@@ -166,6 +176,7 @@ class LearnedRuleTest {
         new ClassifierBuilder()
             .action(ACTION)
             .condition(new Condition(any(), any(), any()))
+            .metadata(Classifier.Metadata.defaults(0))
             .build();
     var sample = new SampleData(Symbol.of("red"));
 

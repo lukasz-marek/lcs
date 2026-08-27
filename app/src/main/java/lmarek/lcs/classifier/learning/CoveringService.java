@@ -1,7 +1,11 @@
-package lmarek.lcs.classifier.rule;
+package lmarek.lcs.classifier.learning;
 
 import java.util.concurrent.ThreadLocalRandom;
 import lmarek.lcs.classifier.data.Sample;
+import lmarek.lcs.classifier.rule.Classifier;
+import lmarek.lcs.classifier.rule.ClassifierBuilder;
+import lmarek.lcs.classifier.rule.Condition;
+import lmarek.lcs.classifier.rule.Matcher;
 import lmarek.lcs.classifier.symbol.Symbol;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -18,10 +22,14 @@ public class CoveringService {
     this.generalizationProbability = generalizationProbability;
   }
 
-  public Classifier generateClassifier(Sample sample) {
+  public Classifier generateClassifier(Sample sample, LearningMetadata learningMetadata) {
     var condition =
         new Condition(sample.data().values().stream().map(this::randomMatcherFor).toList());
-    return new ClassifierBuilder().condition(condition).action(sample.action()).build();
+    return new ClassifierBuilder()
+        .condition(condition)
+        .action(sample.action())
+        .metadata(Classifier.Metadata.defaults(learningMetadata.iteration()))
+        .build();
   }
 
   private Matcher randomMatcherFor(Symbol symbol) {

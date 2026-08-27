@@ -1,4 +1,4 @@
-package lmarek.lcs.classifier.rule;
+package lmarek.lcs.classifier.learning;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -7,12 +7,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.stream.Stream;
 import lmarek.lcs.classifier.data.Sample;
 import lmarek.lcs.classifier.data.SampleData;
+import lmarek.lcs.classifier.rule.Action;
+import lmarek.lcs.classifier.rule.Any;
+import lmarek.lcs.classifier.rule.OneOf;
 import lmarek.lcs.classifier.symbol.Symbol;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class CoveringServiceTest {
+  private static final LearningMetadata LEARNING_METADATA =
+      new LearningMetadataBuilder().iteration(21L).build();
 
   @Test
   void shouldGenerateExactRuleWhenGeneralizationIsDisabled() {
@@ -24,10 +29,11 @@ class CoveringServiceTest {
     var sut = new CoveringService(0);
     // when
 
-    var rule = sut.generateClassifier(sample);
+    var rule = sut.generateClassifier(sample, LEARNING_METADATA);
 
     // then
     assertThat(rule.matches(sample.data())).isTrue(); // ensure that logic is correct
+    assertThat(rule.metadata().timestamp()).isEqualTo(LEARNING_METADATA.iteration());
     assertThat(rule.condition().matchers())
         .allSatisfy(matcher -> assertThat(matcher).isInstanceOf(OneOf.class));
   }
@@ -42,10 +48,11 @@ class CoveringServiceTest {
     var sut = new CoveringService(1);
     // when
 
-    var rule = sut.generateClassifier(sample);
+    var rule = sut.generateClassifier(sample, LEARNING_METADATA);
 
     // then
     assertThat(rule.matches(sample.data())).isTrue(); // ensure that logic is correct
+    assertThat(rule.metadata().timestamp()).isEqualTo(LEARNING_METADATA.iteration());
     assertThat(rule.condition().matchers())
         .allSatisfy(matcher -> assertThat(matcher).isInstanceOf(Any.class));
   }

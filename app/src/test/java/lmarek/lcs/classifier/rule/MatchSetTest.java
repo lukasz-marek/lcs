@@ -17,8 +17,16 @@ class MatchSetTest {
     // given
     var allRules =
         List.of(
-            new ClassifierBuilder().condition(MATCH_GREEN).action(PREDICTION_RED).build(),
-            new ClassifierBuilder().condition(MATCH_BLUE).action(PREDICTION_YELLOW).build());
+            new ClassifierBuilder()
+                .condition(MATCH_GREEN)
+                .action(PREDICTION_RED)
+                .metadata(Classifier.Metadata.defaults(0))
+                .build(),
+            new ClassifierBuilder()
+                .condition(MATCH_BLUE)
+                .action(PREDICTION_YELLOW)
+                .metadata(Classifier.Metadata.defaults(0))
+                .build());
     // when
     var built = new MatchSetBuilder().addAllClassifiers(allRules).build();
 
@@ -31,8 +39,16 @@ class MatchSetTest {
     // given
     var allRules =
         List.of(
-            new ClassifierBuilder().condition(MATCH_GREEN).action(PREDICTION_RED).build(),
-            new ClassifierBuilder().condition(MATCH_BLUE).action(PREDICTION_YELLOW).build());
+            new ClassifierBuilder()
+                .condition(MATCH_GREEN)
+                .action(PREDICTION_RED)
+                .metadata(Classifier.Metadata.defaults(0))
+                .build(),
+            new ClassifierBuilder()
+                .condition(MATCH_BLUE)
+                .action(PREDICTION_YELLOW)
+                .metadata(Classifier.Metadata.defaults(0))
+                .build());
     var sut = new MatchSetBuilder().addAllClassifiers(allRules).build();
     var expected =
         Map.of(
@@ -50,8 +66,16 @@ class MatchSetTest {
     // given
     var allRules =
         List.of(
-            new ClassifierBuilder().condition(MATCH_GREEN).action(PREDICTION_YELLOW).build(),
-            new ClassifierBuilder().condition(MATCH_BLUE).action(PREDICTION_YELLOW).build());
+            new ClassifierBuilder()
+                .condition(MATCH_GREEN)
+                .action(PREDICTION_YELLOW)
+                .metadata(Classifier.Metadata.defaults(0))
+                .build(),
+            new ClassifierBuilder()
+                .condition(MATCH_BLUE)
+                .action(PREDICTION_YELLOW)
+                .metadata(Classifier.Metadata.defaults(0))
+                .build());
     var sut = new MatchSetBuilder().addAllClassifiers(allRules).build();
     var expected = Map.of(PREDICTION_YELLOW, allRules);
 
