@@ -21,7 +21,7 @@ public class CoveringService {
   public Classifier generateClassifier(Sample sample) {
     var condition =
         new Condition(sample.data().values().stream().map(this::randomMatcherFor).toList());
-    return new ClassifierBuilder().condition(condition).prediction(sample.action()).build();
+    return new ClassifierBuilder().condition(condition).action(sample.action()).build();
   }
 
   private Matcher randomMatcherFor(Symbol symbol) {

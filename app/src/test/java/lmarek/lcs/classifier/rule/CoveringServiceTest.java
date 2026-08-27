@@ -20,7 +20,7 @@ class CoveringServiceTest {
     var sample =
         new Sample(
             new SampleData(Stream.of("I", "want", "exact", "match").map(Symbol::of).toList()),
-            Symbol.of("OK"));
+            new Action(Symbol.of("OK")));
     var sut = new CoveringService(0);
     // when
 
@@ -38,7 +38,7 @@ class CoveringServiceTest {
     var sample =
         new Sample(
             new SampleData(Stream.of("I", "want", "exact", "match").map(Symbol::of).toList()),
-            Symbol.of("OK"));
+            new Action(Symbol.of("OK")));
     var sut = new CoveringService(1);
     // when
 

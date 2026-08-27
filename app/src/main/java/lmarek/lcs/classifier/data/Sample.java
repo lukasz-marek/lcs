@@ -1,5 +1,5 @@
 package lmarek.lcs.classifier.data;
 
-import lmarek.lcs.classifier.symbol.Symbol;
+import lmarek.lcs.classifier.rule.Action;
 
-public record Sample(SampleData data, Symbol action) {}
+public record Sample(SampleData data, Action action) {}

@@ -1,7 +1,6 @@
 package lmarek.lcs.classifier.rule;
 
 import lmarek.lcs.classifier.data.SampleData;
-import lmarek.lcs.classifier.symbol.Symbol;
 import org.immutables.value.Value;
 
 @Value.Immutable
@@ -11,7 +10,7 @@ import org.immutables.value.Value;
 public abstract class Classifier {
   abstract Condition condition();
 
-  public abstract Symbol prediction();
+  public abstract Action action();
 
   public boolean matches(SampleData sampleData) {
     return condition().matches(sampleData);

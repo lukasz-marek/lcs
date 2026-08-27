@@ -15,7 +15,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 class LearnedRuleTest {
 
-  public static final Symbol PREDICTION = Symbol.of("white");
+  public static final Action ACTION = new Action(Symbol.of("white"));
 
   static Stream<Arguments> matchingExamples() {
     var builder = Stream.<Arguments>builder();
@@ -135,8 +135,7 @@ class LearnedRuleTest {
   @MethodSource("matchingExamples")
   void shouldMatchSamples(List<Matcher> matchers, List<Symbol> sampleData) {
     // given
-    var sut =
-        new ClassifierBuilder().condition(new Condition(matchers)).prediction(PREDICTION).build();
+    var sut = new ClassifierBuilder().condition(new Condition(matchers)).action(ACTION).build();
     var sample = new SampleData(sampleData);
 
     // when
@@ -150,8 +149,7 @@ class LearnedRuleTest {
   @MethodSource("nonMatchingExamples")
   void shouldNotMatchSamples(List<Matcher> matchers, List<Symbol> sampleData) {
     // given
-    var sut =
-        new ClassifierBuilder().condition(new Condition(matchers)).prediction(PREDICTION).build();
+    var sut = new ClassifierBuilder().condition(new Condition(matchers)).action(ACTION).build();
     var sample = new SampleData(sampleData);
 
     // when
@@ -166,7 +164,7 @@ class LearnedRuleTest {
     // given
     var sut =
         new ClassifierBuilder()
-            .prediction(PREDICTION)
+            .action(ACTION)
             .condition(new Condition(any(), any(), any()))
             .build();
     var sample = new SampleData(Symbol.of("red"));
