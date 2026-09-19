@@ -8,6 +8,7 @@ import java.util.stream.Stream;
 import lmarek.lcs.classifier.data.SampleData;
 import lmarek.lcs.classifier.rule.Action;
 import lmarek.lcs.classifier.rule.Any;
+import lmarek.lcs.classifier.rule.Classifier;
 import lmarek.lcs.classifier.rule.OneOf;
 import lmarek.lcs.classifier.symbol.Symbol;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,8 @@ class CoveringServiceTest {
   void shouldGenerateExactRuleWhenGeneralizationIsDisabled() {
     // given
     var sample = new SampleData(Stream.of("I", "want", "exact", "match").map(Symbol::of).toList());
+    var differentSample =
+        new SampleData(Stream.of("different", "want", "exact", "match").map(Symbol::of).toList());
     var sut = new CoveringService(0);
     // when
 
@@ -29,6 +32,7 @@ class CoveringServiceTest {
 
     // then
     assertThat(rule.matches(sample)).isTrue(); // ensure that logic is correct
+    assertThat(rule.matches(differentSample)).isFalse();
     assertThat(rule.metadata().timestamp()).isEqualTo(LEARNING_METADATA.iteration());
     assertThat(rule.condition().matchers())
         .allSatisfy(matcher -> assertThat(matcher).isInstanceOf(OneOf.class));
@@ -38,6 +42,8 @@ class CoveringServiceTest {
   void shouldGenerateRuleMatchingAllWhenGeneralizationProbabilityIs100Percent() {
     // given
     var sample = new SampleData(Stream.of("I", "want", "exact", "match").map(Symbol::of).toList());
+    var differentSample =
+        new SampleData(Stream.of("another", "sample", "to", "match").map(Symbol::of).toList());
     var sut = new CoveringService(1);
     // when
 
@@ -45,9 +51,28 @@ class CoveringServiceTest {
 
     // then
     assertThat(rule.matches(sample)).isTrue(); // ensure that logic is correct
+    assertThat(rule.matches(differentSample)).isTrue();
     assertThat(rule.metadata().timestamp()).isEqualTo(LEARNING_METADATA.iteration());
     assertThat(rule.condition().matchers())
         .allSatisfy(matcher -> assertThat(matcher).isInstanceOf(Any.class));
+  }
+
+  @ParameterizedTest
+  @ValueSource(doubles = {0, 0.5, 1})
+  void shouldGenerateMatchingRuleWithRequestedActionAndDefaultMetadata(double probability) {
+    // given
+    var sample = new SampleData(Symbol.of("red"), Symbol.of("green"), Symbol.of("blue"));
+    var action = new Action(Symbol.of("OK"));
+    var sut = new CoveringService(probability);
+
+    // when
+    var rule = sut.generateClassifier(sample, action, LEARNING_METADATA);
+
+    // then
+    assertThat(rule.matches(sample)).isTrue();
+    assertThat(rule.action()).isEqualTo(action);
+    assertThat(rule.metadata())
+        .isEqualTo(Classifier.Metadata.defaults(LEARNING_METADATA.iteration()));
   }
 
   @ParameterizedTest
