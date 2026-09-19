@@ -2,7 +2,6 @@ package lmarek.lcs.classifier.data;
 
 import java.util.ArrayList;
 import java.util.List;
-import lmarek.lcs.classifier.symbol.Symbol;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -10,8 +9,8 @@ class SampleDataTest {
   @Test
   void shouldKeepValuesWhenSourceListChanges() {
     // given
-    var red = Symbol.of("red");
-    var green = Symbol.of("green");
+    var red = "red";
+    var green = "green";
     var values = new ArrayList<>(List.of(red, green, red));
     var sut = new SampleData(values);
 
@@ -25,13 +24,13 @@ class SampleDataTest {
   @Test
   void shouldKeepValuesWhenSourceArrayChanges() {
     // given
-    var red = Symbol.of("red");
-    var green = Symbol.of("green");
-    var values = new Symbol[] {red, green, red};
+    var red = "red";
+    var green = "green";
+    var values = new String[] {red, green, red};
     var sut = new SampleData(values);
 
     // when
-    values[0] = Symbol.of("blue");
+    values[0] = "blue";
 
     // then
     Assertions.assertThat(sut.values()).containsExactly(red, green, red);
@@ -40,7 +39,7 @@ class SampleDataTest {
   @Test
   void shouldNotAllowModifyingValues() {
     // given
-    var values = new ArrayList<>(List.of(Symbol.of("red")));
+    var values = new ArrayList<>(List.of("red"));
     var sut = new SampleData(values);
 
     // when / then

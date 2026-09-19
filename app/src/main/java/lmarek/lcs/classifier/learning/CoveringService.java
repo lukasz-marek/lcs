@@ -7,7 +7,6 @@ import lmarek.lcs.classifier.rule.Classifier;
 import lmarek.lcs.classifier.rule.ClassifierBuilder;
 import lmarek.lcs.classifier.rule.Condition;
 import lmarek.lcs.classifier.rule.Matcher;
-import lmarek.lcs.classifier.symbol.Symbol;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -35,8 +34,8 @@ public class CoveringService {
         .build();
   }
 
-  private Matcher randomMatcherFor(Symbol symbol) {
+  private Matcher randomMatcherFor(String value) {
     var generalize = ThreadLocalRandom.current().nextDouble() < generalizationProbability;
-    return generalize ? Matcher.any() : Matcher.oneOf(symbol);
+    return generalize ? Matcher.any() : Matcher.oneOf(value);
   }
 }

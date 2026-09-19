@@ -6,7 +6,6 @@ import static lmarek.lcs.classifier.rule.Matcher.oneOf;
 import java.util.List;
 import java.util.stream.Stream;
 import lmarek.lcs.classifier.data.SampleData;
-import lmarek.lcs.classifier.symbol.Symbol;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -15,71 +14,44 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 class ClassifierTest {
 
-  private static final Action ACTION = new Action(Symbol.of("white"));
+  private static final Action ACTION = new Action("white");
 
   static Stream<Arguments> matchingExamples() {
     var builder = Stream.<Arguments>builder();
     // use of any
+    builder.accept(Arguments.of(List.of(any(), any(), any()), List.of("red", "red", "red")));
+    builder.accept(Arguments.of(List.of(oneOf("red"), any(), any()), List.of("red", "red", "red")));
+    builder.accept(
+        Arguments.of(List.of(oneOf("red"), oneOf("red"), any()), List.of("red", "red", "red")));
     builder.accept(
         Arguments.of(
-            List.of(any(), any(), any()),
-            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
+            List.of(oneOf("red"), oneOf("red"), oneOf("red")), List.of("red", "red", "red")));
+    // multiple values matched
     builder.accept(
         Arguments.of(
-            List.of(oneOf(Symbol.of("red")), any(), any()),
-            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
+            List.of(oneOf("red", "green"), oneOf("red"), oneOf("red")),
+            List.of("red", "red", "red")));
     builder.accept(
         Arguments.of(
-            List.of(oneOf(Symbol.of("red")), oneOf(Symbol.of("red")), any()),
-            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
+            List.of(oneOf("red", "green"), oneOf("red", "green"), oneOf("red")),
+            List.of("red", "red", "red")));
     builder.accept(
         Arguments.of(
-            List.of(oneOf(Symbol.of("red")), oneOf(Symbol.of("red")), oneOf(Symbol.of("red"))),
-            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
-    // multiple symbols matched
+            List.of(oneOf("red", "green"), oneOf("red", "green"), oneOf("red", "green")),
+            List.of("red", "red", "red")));
+    // mixed values in sample
     builder.accept(
         Arguments.of(
-            List.of(
-                oneOf(Symbol.of("red"), Symbol.of("green")),
-                oneOf(Symbol.of("red")),
-                oneOf(Symbol.of("red"))),
-            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
+            List.of(oneOf("red", "green"), oneOf("red"), oneOf("red")),
+            List.of("green", "red", "red")));
     builder.accept(
         Arguments.of(
-            List.of(
-                oneOf(Symbol.of("red"), Symbol.of("green")),
-                oneOf(Symbol.of("red"), Symbol.of("green")),
-                oneOf(Symbol.of("red"))),
-            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
+            List.of(oneOf("red", "green"), oneOf("red", "green"), oneOf("red")),
+            List.of("green", "green", "red")));
     builder.accept(
         Arguments.of(
-            List.of(
-                oneOf(Symbol.of("red"), Symbol.of("green")),
-                oneOf(Symbol.of("red"), Symbol.of("green")),
-                oneOf(Symbol.of("red"), Symbol.of("green"))),
-            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
-    // mixed symbols in sample
-    builder.accept(
-        Arguments.of(
-            List.of(
-                oneOf(Symbol.of("red"), Symbol.of("green")),
-                oneOf(Symbol.of("red")),
-                oneOf(Symbol.of("red"))),
-            List.of(Symbol.of("green"), Symbol.of("red"), Symbol.of("red"))));
-    builder.accept(
-        Arguments.of(
-            List.of(
-                oneOf(Symbol.of("red"), Symbol.of("green")),
-                oneOf(Symbol.of("red"), Symbol.of("green")),
-                oneOf(Symbol.of("red"))),
-            List.of(Symbol.of("green"), Symbol.of("green"), Symbol.of("red"))));
-    builder.accept(
-        Arguments.of(
-            List.of(
-                oneOf(Symbol.of("red"), Symbol.of("green")),
-                oneOf(Symbol.of("red"), Symbol.of("green")),
-                oneOf(Symbol.of("red"), Symbol.of("green"))),
-            List.of(Symbol.of("green"), Symbol.of("green"), Symbol.of("green"))));
+            List.of(oneOf("red", "green"), oneOf("red", "green"), oneOf("red", "green")),
+            List.of("green", "green", "green")));
     return builder.build();
   }
 
@@ -87,53 +59,36 @@ class ClassifierTest {
     var builder = Stream.<Arguments>builder();
     // use of any
     builder.accept(
-        Arguments.of(
-            List.of(any(), oneOf(Symbol.of("red")), oneOf(Symbol.of("green"))),
-            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
+        Arguments.of(List.of(any(), oneOf("red"), oneOf("green")), List.of("red", "red", "red")));
+    builder.accept(
+        Arguments.of(List.of(oneOf("green"), any(), any()), List.of("red", "red", "red")));
+    builder.accept(
+        Arguments.of(List.of(oneOf("green"), oneOf("red"), any()), List.of("red", "red", "red")));
     builder.accept(
         Arguments.of(
-            List.of(oneOf(Symbol.of("green")), any(), any()),
-            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
+            List.of(oneOf("red"), oneOf("green"), oneOf("red")), List.of("red", "red", "red")));
     builder.accept(
         Arguments.of(
-            List.of(oneOf(Symbol.of("green")), oneOf(Symbol.of("red")), any()),
-            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
+            List.of(oneOf("red"), oneOf("red"), oneOf("green")), List.of("red", "red", "red")));
+    // multiple values matched
     builder.accept(
         Arguments.of(
-            List.of(oneOf(Symbol.of("red")), oneOf(Symbol.of("green")), oneOf(Symbol.of("red"))),
-            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
+            List.of(oneOf("red", "green"), oneOf("red"), oneOf("red")),
+            List.of("red", "red", "blue")));
     builder.accept(
         Arguments.of(
-            List.of(oneOf(Symbol.of("red")), oneOf(Symbol.of("red")), oneOf(Symbol.of("green"))),
-            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("red"))));
-    // multiple symbols matched
+            List.of(oneOf("red", "green"), oneOf("red", "green"), oneOf("red")),
+            List.of("blue", "blue", "red")));
     builder.accept(
         Arguments.of(
-            List.of(
-                oneOf(Symbol.of("red"), Symbol.of("green")),
-                oneOf(Symbol.of("red")),
-                oneOf(Symbol.of("red"))),
-            List.of(Symbol.of("red"), Symbol.of("red"), Symbol.of("blue"))));
-    builder.accept(
-        Arguments.of(
-            List.of(
-                oneOf(Symbol.of("red"), Symbol.of("green")),
-                oneOf(Symbol.of("red"), Symbol.of("green")),
-                oneOf(Symbol.of("red"))),
-            List.of(Symbol.of("blue"), Symbol.of("blue"), Symbol.of("red"))));
-    builder.accept(
-        Arguments.of(
-            List.of(
-                oneOf(Symbol.of("red"), Symbol.of("green")),
-                oneOf(Symbol.of("red"), Symbol.of("green")),
-                oneOf(Symbol.of("red"), Symbol.of("green"))),
-            List.of(Symbol.of("blue"), Symbol.of("blue"), Symbol.of("blue"))));
+            List.of(oneOf("red", "green"), oneOf("red", "green"), oneOf("red", "green")),
+            List.of("blue", "blue", "blue")));
     return builder.build();
   }
 
   @ParameterizedTest
   @MethodSource("matchingExamples")
-  void shouldMatchSamples(List<Matcher> matchers, List<Symbol> sampleData) {
+  void shouldMatchSamples(List<Matcher> matchers, List<String> sampleData) {
     // given
     var sut =
         new ClassifierBuilder()
@@ -152,7 +107,7 @@ class ClassifierTest {
 
   @ParameterizedTest
   @MethodSource("nonMatchingExamples")
-  void shouldNotMatchSamples(List<Matcher> matchers, List<Symbol> sampleData) {
+  void shouldNotMatchSamples(List<Matcher> matchers, List<String> sampleData) {
     // given
     var sut =
         new ClassifierBuilder()
@@ -178,7 +133,7 @@ class ClassifierTest {
             .condition(new Condition(any(), any(), any()))
             .metadata(Classifier.Metadata.defaults(0))
             .build();
-    var sample = new SampleData(Symbol.of("red"));
+    var sample = new SampleData("red");
 
     // when / then
     Assertions.assertThatThrownBy(() -> sut.matches(sample))

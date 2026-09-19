@@ -1,15 +1,13 @@
 package lmarek.lcs.classifier.rule;
 
-import lmarek.lcs.classifier.symbol.Symbol;
-
 public interface Matcher {
-  boolean matches(Symbol tested);
+  boolean matches(String tested);
 
   static Matcher any() {
     return new Any();
   }
 
-  static Matcher oneOf(Symbol... symbols) {
-    return new OneOf(symbols);
+  static Matcher oneOf(String... values) {
+    return new OneOf(values);
   }
 }

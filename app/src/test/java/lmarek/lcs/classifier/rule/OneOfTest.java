@@ -2,7 +2,6 @@ package lmarek.lcs.classifier.rule;
 
 import java.util.HashSet;
 import java.util.Set;
-import lmarek.lcs.classifier.symbol.Symbol;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -14,9 +13,9 @@ class OneOfTest {
   @ValueSource(strings = {"red", "green", "blue"})
   void allowedValuesMatch(String tested) {
     // given
-    var sut = new OneOf(Symbol.of("red"), Symbol.of("green"), Symbol.of("blue"));
+    var sut = new OneOf("red", "green", "blue");
     // when
-    var matches = sut.matches(Symbol.of(tested));
+    var matches = sut.matches(tested);
     // then
     Assertions.assertThat(matches).isTrue();
   }
@@ -25,18 +24,18 @@ class OneOfTest {
   @ValueSource(strings = {"red", "green", "blue"})
   void nonAllowedValuesDoNotMatch(String tested) {
     // given
-    var sut = new OneOf(Symbol.of("black"), Symbol.of("white"));
+    var sut = new OneOf("black", "white");
     // when
-    var matches = sut.matches(Symbol.of(tested));
+    var matches = sut.matches(tested);
     // then
     Assertions.assertThat(matches).isFalse();
   }
 
   @Test
-  void shouldKeepMatchingOriginalSymbolsWhenSourceSetChanges() {
+  void shouldKeepMatchingOriginalValuesWhenSourceSetChanges() {
     // given
-    var red = Symbol.of("red");
-    var green = Symbol.of("green");
+    var red = "red";
+    var green = "green";
     var allowedValues = new HashSet<>(Set.of(red));
     var sut = new OneOf(allowedValues);
 
@@ -50,11 +49,11 @@ class OneOfTest {
   }
 
   @Test
-  void shouldKeepMatchingOriginalSymbolsWhenSourceArrayChanges() {
+  void shouldKeepMatchingOriginalValuesWhenSourceArrayChanges() {
     // given
-    var red = Symbol.of("red");
-    var green = Symbol.of("green");
-    var allowedValues = new Symbol[] {red};
+    var red = "red";
+    var green = "green";
+    var allowedValues = new String[] {red};
     var sut = new OneOf(allowedValues);
 
     // when
@@ -68,7 +67,7 @@ class OneOfTest {
   @Test
   void shouldNotAllowModifyingAllowedValues() {
     // given
-    var allowedValues = new HashSet<>(Set.of(Symbol.of("red")));
+    var allowedValues = new HashSet<>(Set.of("red"));
     var sut = new OneOf(allowedValues);
 
     // when / then
@@ -82,9 +81,23 @@ class OneOfTest {
     var sut = new OneOf();
 
     // when
-    var matches = sut.matches(Symbol.of("red"));
+    var matches = sut.matches("red");
 
     // then
     Assertions.assertThat(matches).isFalse();
+  }
+
+  @Test
+  void shouldMatchEqualStringsWithDifferentReferences() {
+    // given
+    var sut = new OneOf("red");
+    var tested = new String(new char[] {'r', 'e', 'd'});
+
+    // when
+    var matches = sut.matches(tested);
+
+    // then
+    Assertions.assertThat(tested).isNotSameAs("red");
+    Assertions.assertThat(matches).isTrue();
   }
 }

@@ -1,19 +1,18 @@
 package lmarek.lcs.classifier.rule;
 
 import java.util.Set;
-import lmarek.lcs.classifier.symbol.Symbol;
 
-public record OneOf(Set<Symbol> allowedValues) implements Matcher {
+public record OneOf(Set<String> allowedValues) implements Matcher {
   public OneOf {
     allowedValues = Set.copyOf(allowedValues);
   }
 
-  public OneOf(Symbol... allowedValues) {
+  public OneOf(String... allowedValues) {
     this(Set.of(allowedValues));
   }
 
   @Override
-  public boolean matches(Symbol tested) {
+  public boolean matches(String tested) {
     return allowedValues().contains(tested);
   }
 }

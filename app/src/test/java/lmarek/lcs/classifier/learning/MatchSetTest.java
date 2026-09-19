@@ -7,15 +7,14 @@ import lmarek.lcs.classifier.rule.Classifier;
 import lmarek.lcs.classifier.rule.ClassifierBuilder;
 import lmarek.lcs.classifier.rule.Condition;
 import lmarek.lcs.classifier.rule.Matcher;
-import lmarek.lcs.classifier.symbol.Symbol;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class MatchSetTest {
-  private static final Condition MATCH_GREEN = new Condition(Matcher.oneOf(Symbol.of("green")));
-  private static final Condition MATCH_BLUE = new Condition(Matcher.oneOf(Symbol.of("blue")));
-  private static final Action PREDICTION_RED = new Action(Symbol.of("red"));
-  private static final Action PREDICTION_YELLOW = new Action(Symbol.of("yellow"));
+  private static final Condition MATCH_GREEN = new Condition(Matcher.oneOf("green"));
+  private static final Condition MATCH_BLUE = new Condition(Matcher.oneOf("blue"));
+  private static final Action PREDICTION_RED = new Action("red");
+  private static final Action PREDICTION_YELLOW = new Action("yellow");
 
   @Test
   void returnsAllClassifiers() {

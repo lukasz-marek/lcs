@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import lmarek.lcs.classifier.data.SampleData;
-import lmarek.lcs.classifier.symbol.Symbol;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -14,8 +13,8 @@ class ConditionTest {
   @Test
   void shouldKeepMatchingOriginalSampleWhenSourceListChanges() {
     // given
-    var red = Symbol.of("red");
-    var green = Symbol.of("green");
+    var red = "red";
+    var green = "green";
     var matchers = new ArrayList<Matcher>(List.of(Matcher.oneOf(red)));
     var sut = new Condition(matchers);
 
@@ -41,8 +40,8 @@ class ConditionTest {
   @Test
   void shouldKeepMatchingOriginalSampleWhenSourceArrayChanges() {
     // given
-    var red = Symbol.of("red");
-    var green = Symbol.of("green");
+    var red = "red";
+    var green = "green";
     var matchers = new Matcher[] {Matcher.oneOf(red)};
     var sut = new Condition(matchers);
 
@@ -59,7 +58,7 @@ class ConditionTest {
   void shouldRejectSamplesWithDifferentAttributeCount(int sampleSize) {
     // given
     var sut = new Condition(Matcher.any());
-    var sample = new SampleData(Collections.nCopies(sampleSize, Symbol.of("red")));
+    var sample = new SampleData(Collections.nCopies(sampleSize, "red"));
 
     // when / then
     Assertions.assertThatThrownBy(() -> sut.matches(sample))
