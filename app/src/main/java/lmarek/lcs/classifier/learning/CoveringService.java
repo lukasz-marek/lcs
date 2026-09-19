@@ -17,7 +17,9 @@ public class CoveringService {
 
   public CoveringService(
       @Value("${learning.generalization.probability}") double generalizationProbability) {
-    if (generalizationProbability < 0 || generalizationProbability > 1) {
+    if (!Double.isFinite(generalizationProbability)
+        || generalizationProbability < 0
+        || generalizationProbability > 1) {
       throw new IllegalArgumentException("probability must be between 0 and 1");
     }
     this.generalizationProbability = generalizationProbability;

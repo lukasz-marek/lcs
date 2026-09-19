@@ -58,6 +58,14 @@ class CoveringServiceTest {
   }
 
   @ParameterizedTest
+  @ValueSource(doubles = {Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY})
+  void shouldThrowWhenProbabilityIsNotFinite(double probability) {
+    // when / then
+    assertThatThrownBy(() -> new CoveringService(probability))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @ParameterizedTest
   @ValueSource(doubles = {0, 0.001, 0.1, 0.5, 0.9, 0.999, 1})
   void shouldAllowValidProbabilities(double probability) {
     assertThatCode(() -> new CoveringService(probability)).doesNotThrowAnyException();
