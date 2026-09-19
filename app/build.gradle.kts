@@ -23,6 +23,7 @@ dependencies {
     // immutables
     annotationProcessor(libs.immutables.annotation.processor)
     compileOnly(libs.immutables.annotations)
+    testCompileOnly(libs.immutables.annotations)
 
     // errorprone
     errorprone(libs.errorprone)
