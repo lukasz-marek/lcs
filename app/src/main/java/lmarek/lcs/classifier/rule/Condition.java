@@ -5,6 +5,10 @@ import java.util.stream.IntStream;
 import lmarek.lcs.classifier.data.SampleData;
 
 public record Condition(List<Matcher> matchers) {
+  public Condition {
+    matchers = List.copyOf(matchers);
+  }
+
   public Condition(Matcher... matchers) {
     this(List.of(matchers));
   }
