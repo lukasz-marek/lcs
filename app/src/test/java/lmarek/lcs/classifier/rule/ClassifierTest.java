@@ -15,7 +15,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 class ClassifierTest {
 
-  public static final Action ACTION = new Action(Symbol.of("white"));
+  private static final Action ACTION = new Action(Symbol.of("white"));
 
   static Stream<Arguments> matchingExamples() {
     var builder = Stream.<Arguments>builder();
