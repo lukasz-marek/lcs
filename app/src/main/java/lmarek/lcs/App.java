@@ -4,14 +4,11 @@
 package lmarek.lcs;
 
 import org.springframework.boot.SpringApplication;
-import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
 public class App {
-  static void main(String[] args) {
-    var application = new SpringApplication(App.class);
-    application.setWebApplicationType(WebApplicationType.NONE);
-    application.run(args);
+  public static void main(String[] args) {
+    SpringApplication.run(App.class, args);
   }
 }

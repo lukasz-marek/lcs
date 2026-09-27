@@ -1,4 +1,11 @@
 ---
-learning:
-  generalization:
-    probability: 0.1
+server:
+  address: "127.0.0.1"
+  port: 8080
+spring:
+  application:
+    name: "lcs-spectator-arena"
+arena:
+  performance:
+    matching-workers: "${ARENA_PERFORMANCE_MATCHING_WORKERS:1}"
+    parallel-threshold: "${ARENA_PERFORMANCE_PARALLEL_THRESHOLD:32768}"

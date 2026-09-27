@@ -1,0 +1,13 @@
+package lmarek.lcs.arena;
+
+import java.util.Map;
+import java.util.Objects;
+import lmarek.lcs.agent.AgentKind;
+
+public record AgentConfiguration(AgentKind kind, String preset, Map<String, Double> settings) {
+  public AgentConfiguration {
+    Objects.requireNonNull(kind);
+    Objects.requireNonNull(preset);
+    settings = Map.copyOf(settings);
+  }
+}

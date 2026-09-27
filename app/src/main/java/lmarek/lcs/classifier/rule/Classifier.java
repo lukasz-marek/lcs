@@ -23,7 +23,7 @@ public abstract class Classifier {
       overshadowImplementation = true,
       visibility = Value.Style.ImplementationVisibility.PRIVATE)
   public abstract static class Metadata {
-    @Value.Default.Double(10.0)
+    @Value.Default.Double(0.0)
     public abstract double prediction();
 
     @Value.Default.Double(0.0)
@@ -38,8 +38,8 @@ public abstract class Classifier {
     @Value.Default.Long(1)
     public abstract long numerosity();
 
-    @Value.Default.Int(1)
-    public abstract int actionSetSize();
+    @Value.Default.Double(1.0)
+    public abstract double actionSetSize();
 
     public abstract long timestamp();
 

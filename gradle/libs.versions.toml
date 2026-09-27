@@ -12,7 +12,7 @@ immutables = "2.12.2"
 guava = "33.6.0-jre"
 
 [libraries]
-spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter", version.ref = "spring-boot" }
+spring-boot-starter-webmvc = { module = "org.springframework.boot:spring-boot-starter-webmvc", version.ref = "spring-boot" }
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test", version.ref = "spring-boot" }
 jspecify = { module = "org.jspecify:jspecify", version.ref = "jspecify" }
 errorprone = { module = "com.google.errorprone:error_prone_core", version.ref = "errorprone" }
@@ -23,5 +23,6 @@ immutables-annotations = { module = "org.immutables:value-annotations", version.
 guava = { module = "com.google.guava:guava", version.ref = "guava" }
 
 [plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 errorprone = { id = "net.ltgt.errorprone", version.ref = "errorprone-plugin" }

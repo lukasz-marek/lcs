@@ -1,27 +1,42 @@
 package lmarek.lcs.classifier.learning;
 
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.SplittableRandom;
+import java.util.random.RandomGenerator;
 import lmarek.lcs.classifier.data.SampleData;
 import lmarek.lcs.classifier.rule.Action;
 import lmarek.lcs.classifier.rule.Classifier;
 import lmarek.lcs.classifier.rule.ClassifierBuilder;
 import lmarek.lcs.classifier.rule.Condition;
 import lmarek.lcs.classifier.rule.Matcher;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
 public class CoveringService {
   private final double generalizationProbability;
+  private final RandomGenerator random;
 
+  @Autowired
   public CoveringService(
-      @Value("${learning.generalization.probability}") double generalizationProbability) {
+      @Value("${learning.generalization.probability:0.33}") double generalizationProbability,
+      @Value("${learning.seed:0}") long seed) {
+    this(generalizationProbability, new SplittableRandom(seed));
+  }
+
+  /** Convenience constructor for small experiments with a repeatable seed. */
+  public CoveringService(double generalizationProbability) {
+    this(generalizationProbability, new SplittableRandom(0));
+  }
+
+  public CoveringService(double generalizationProbability, RandomGenerator random) {
     if (!Double.isFinite(generalizationProbability)
         || generalizationProbability < 0
         || generalizationProbability > 1) {
       throw new IllegalArgumentException("probability must be between 0 and 1");
     }
     this.generalizationProbability = generalizationProbability;
+    this.random = random;
   }
 
   public Classifier generateClassifier(
@@ -35,7 +50,7 @@ public class CoveringService {
   }
 
   private Matcher randomMatcherFor(String value) {
-    var generalize = ThreadLocalRandom.current().nextDouble() < generalizationProbability;
+    var generalize = random.nextDouble() < generalizationProbability;
     return generalize ? Matcher.any() : Matcher.oneOf(value);
   }
 }

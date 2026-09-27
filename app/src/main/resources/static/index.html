@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Watch XCS learn international draughts against search and random agents."
+    />
+    <title>Crown &amp; Code — LCS Spectator Arena</title>
+    <link rel="stylesheet" href="/arena.css" />
+    <script src="/arena.js" defer></script>
+  </head>
+  <body>
+    <div class="noise" aria-hidden="true"></div>
+    <header class="masthead">
+      <div>
+        <p class="eyebrow">INTERNATIONAL DRAUGHTS · LEARNING LAB</p>
+        <h1>Crown <span>&amp;</span> Code</h1>
+      </div>
+      <div class="run-state">
+        <span id="status-dot" class="status-dot idle"></span>
+        <div>
+          <small>ARENA STATUS</small>
+          <strong id="status-label">IDLE</strong>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="setup card" aria-labelledby="setup-heading">
+        <div class="section-heading">
+          <div>
+            <p class="kicker">MATCHMAKER</p>
+            <h2 id="setup-heading">Build a rivalry</h2>
+          </div>
+          <p class="section-note">Each run starts both competitors from scratch.</p>
+        </div>
+
+        <div class="matchup-grid">
+          <fieldset class="competitor competitor-a">
+            <legend><span>A</span> Challenger</legend>
+            <label>Method<select id="agent-a-kind"></select></label>
+            <label>Preset<select id="agent-a-preset"></select></label>
+            <details>
+              <summary>Advanced settings</summary>
+              <div id="agent-a-advanced" class="advanced-grid"></div>
+            </details>
+          </fieldset>
+
+          <div class="versus" aria-hidden="true"><span>VS</span></div>
+
+          <fieldset class="competitor competitor-b">
+            <legend><span>B</span> Defender</legend>
+            <label>Method<select id="agent-b-kind"></select></label>
+            <label>Preset<select id="agent-b-preset"></select></label>
+            <details>
+              <summary>Advanced settings</summary>
+              <div id="agent-b-advanced" class="advanced-grid"></div>
+            </details>
+          </fieldset>
+        </div>
+
+        <div class="run-options">
+          <label
+            >Seed<input
+              id="seed"
+              type="text"
+              value="20250920"
+              inputmode="numeric"
+              pattern="-?[0-9]+"
+              spellcheck="false"
+            />
+          </label>
+          <label>
+            Evaluation interval
+            <input id="evaluation-interval" type="number" value="500" min="1" step="1" />
+          </label>
+          <label>
+            Evaluation games
+            <input id="evaluation-games" type="number" value="20" min="2" step="2" />
+          </label>
+          <div id="pacing-choice" class="pacing-choice" role="group" aria-label="Pacing"></div>
+          <button id="start" class="primary" type="button">Start the arena <span>→</span></button>
+        </div>
+      </section>
+
+      <section id="arena" class="arena-grid" aria-live="polite">
+        <article class="board-card card">
+          <div class="section-heading compact">
+            <div>
+              <p id="game-mode" class="kicker">WAITING FOR A RUN</p>
+              <h2 id="game-title">Game —</h2>
+            </div>
+            <div class="controls">
+              <button id="pause" class="secondary" disabled type="button">Pause</button>
+              <button id="stop" class="danger" disabled type="button">Stop</button>
+            </div>
+          </div>
+
+          <div class="seat-row black-seat">
+            <div class="mini-piece black"></div>
+            <strong id="black-name">Black</strong>
+            <span id="black-kind">—</span>
+          </div>
+          <div id="board" class="board" role="grid" aria-label="International draughts board"></div>
+          <div class="seat-row white-seat">
+            <div class="mini-piece white"></div>
+            <strong id="white-name">White</strong>
+            <span id="white-kind">—</span>
+          </div>
+          <p id="run-error" class="run-error" role="alert" hidden></p>
+          <div id="move-caption" class="move-caption">The first move will appear here.</div>
+        </article>
+
+        <aside class="score-column">
+          <article class="card scoreboard">
+            <div class="score-head">
+              <p class="kicker">TRAINING SCORE</p>
+              <strong id="training-count">0 games</strong>
+            </div>
+            <div class="score-row">
+              <div><span class="a-mark">A</span><strong id="a-wins">0</strong><small>WINS</small></div>
+              <div><span class="draw-mark">=</span><strong id="draws">0</strong><small>DRAWS</small></div>
+              <div><span class="b-mark">B</span><strong id="b-wins">0</strong><small>WINS</small></div>
+            </div>
+            <div class="metrics-strip">
+              <span><small>ROLLING 100</small><b id="rolling">—</b></span>
+              <span><small>AVG LENGTH</small><b id="average-length">—</b></span>
+              <span><small>THROUGHPUT</small><b id="throughput">—</b></span>
+            </div>
+          </article>
+
+          <article class="card chart-card">
+            <div class="tab-bar">
+              <button class="chart-tab active" data-chart="results" type="button">Results</button>
+              <button class="chart-tab" data-chart="learning" type="button">XCS learning</button>
+              <button class="chart-tab" data-chart="evaluation" type="button">Evaluation</button>
+            </div>
+            <label id="learning-metric-label" hidden>Learning metric
+              <select id="learning-metric">
+                <option value="population">Population (micro-classifiers)</option>
+                <option value="generality">Generality (wildcard fraction)</option>
+                <option value="error">Prediction error</option>
+                <option value="covering">Covering (total rules created)</option>
+              </select>
+            </label>
+            <canvas id="main-chart" width="720" height="280" aria-label="Arena statistics chart"></canvas>
+            <div id="chart-legend" class="chart-legend"></div>
+          </article>
+
+          <article class="card decision-card">
+            <div class="section-heading compact">
+              <div><p class="kicker">MOVE LAB</p><h3>Why this move?</h3></div>
+              <span id="decision-method" class="method-chip">—</span>
+            </div>
+            <p id="decision-help" class="help-copy">Decision evidence appears after an agent moves.</p>
+            <div id="decision-bars" class="decision-bars"></div>
+          </article>
+        </aside>
+      </section>
+
+      <section class="lower-grid">
+        <article class="card evolution-card">
+          <div class="section-heading compact">
+            <div><p class="kicker">EVOLUTION WIRE</p><h2>XCS population events</h2></div>
+            <span id="population-size" class="counter">0 micro rules</span>
+          </div>
+          <ol id="evolution-feed" class="event-feed">
+            <li class="empty-state">Covering, crossover, mutation, and deletion events will appear here.</li>
+          </ol>
+        </article>
+
+        <article class="card inspector-card">
+          <div class="section-heading compact">
+            <div><p class="kicker">RULE INSPECTOR</p><h2>Classifier anatomy</h2></div>
+            <div class="rule-search">
+              <label
+                >Competitor
+                <select id="rule-competitor" aria-label="Rule competitor"></select>
+              </label>
+              <label
+                >Rule ID<input id="rule-id" placeholder="e.g. 42" inputmode="numeric" />
+              </label>
+            </div>
+          </div>
+          <div id="rule-inspector" class="rule-inspector empty-state">
+            Select a rule ID from the evolution wire to inspect its condition, action, lineage, and last 50 changes.
+          </div>
+          <p class="notation-note">
+            A wildcard means this rule ignores that attribute. It does not mean the attribute is irrelevant to every rule.
+          </p>
+        </article>
+
+        <article class="card replay-card">
+          <div class="section-heading compact">
+            <div><p class="kicker">REPLAY VAULT</p><h2>Last 20 games</h2></div>
+            <select id="replay-picker" aria-label="Choose the live board or a replay">
+              <option value="LIVE">Live board</option>
+            </select>
+          </div>
+          <div class="replay-controls">
+            <button id="replay-start" class="secondary" type="button">|◀</button>
+            <button id="replay-prev" class="secondary" type="button">◀</button>
+            <input id="replay-slider" type="range" min="0" max="0" value="0" aria-label="Replay move" />
+            <button id="replay-next" class="secondary" type="button">▶</button>
+            <button id="replay-play" class="secondary" type="button">Play</button>
+          </div>
+          <p id="replay-caption" class="help-copy">Completed games remain available for this browser session.</p>
+        </article>
+      </section>
+
+      <div id="toast" class="toast" role="status"></div>
+    </main>
+
+    <footer>
+      <p>Predictions are expected discounted returns, not win probabilities. Prediction error measures target discrepancy, not confidence.</p>
+      <a href="/api/arena/options">API options</a>
+    </footer>
+  </body>
+</html>
