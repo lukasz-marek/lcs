@@ -109,14 +109,39 @@ be changed with `-PsoakSeconds=3600`.
 
 ### Measurements and gates
 
-A 3-fork, 5-warmup, 5-measurement one-million-rule matching campaign has completed on the local machine and is being repeated with JSON output for the report. No 60-minute soak has been completed, so the memory and sustained-load gates are still open. The jcstress run completed 84 configurations across three tests with zero forbidden outcomes; it provides evidence but is not a proof that no race exists. The available machine
-reports AMD Ryzen 7 9800X3D (8 cores / 16 threads), 62 GiB physical memory, and Temurin OpenJDK
-25.0.4. This differs from the requested 15-worker target only in the number of logical CPUs exposed;
-benchmark worker counts remain available through 15. Run the harnesses on the target host and record
-JMH JSON, JFR, heap/GC metrics, p50/p95 and comparison results here before considering a parallel
-threshold default. Retained histories remain 50 entries per resident rule; memory acceptance at two
-million total rules is currently unmeasured.
+The one-million-rule JMH campaign used Temurin OpenJDK 25.0.4, a 32 GiB heap, an AMD Ryzen 7
+9800X3D (8 cores / 16 threads), and 1,000 action IDs. The fixture exposed 50 legal actions, so
+matching inspected 50,000 of 1,000,000 candidates. All matching conditions matched. JMH used three
+forks, five one-second warmup iterations, five one-second measurements, throughput and sample-time
+modes, and GC profiling. The JSON report is at `app/build/jmh-sparse-million-final.json`.
 
-The normal regression suite passes on the integrated code. The cancellation tests force actual task
-exit with latches, and subscriber operations use a synchronized single-slot mailbox. jcstress tests ran successfully in quick mode. They test publication and subscriber close/order behavior, but do not prove the absence of every race. Existing web and browser tests should also be run as part of the target
-release campaign.
+| Implementation | Throughput | Sample p95 | Allocation per decision |
+| --- | ---: | ---: | ---: |
+| Original sequential reference | 31.9 decisions/s | 35.0 ms | 7.43 MB |
+| Indexed sequential | 166.1 decisions/s | 8.63 ms | 11.40 MB |
+| Indexed with 15 matching workers | 196.5 decisions/s | 6.39 ms | 12.73 MB |
+
+The indexed sequential path is 5.2× faster than the reference on this fixture. Parallel matching is
+18.3% faster than indexed sequential and lowers sample p95 by 26%, but misses the 20% throughput
+gate. It stays disabled by default (`matching-workers=1`). Parallel matching allocates about 1.33 MB
+more per decision on this fixture. The 2× baseline throughput gate passes for this sparse legal-action
+fixture; this does not establish performance for every population shape.
+
+The 10k-rule fixture used the same 50-of-1,000 legal-action ratio, with matching conditions all
+matching. Indexed sequential measured 20,574 decisions/s and 0.052 ms sample p95, versus 6,946/s
+and 0.147 ms for the reference. There is no regression on this fixture. Full results are in
+`app/build/jmh-small-population.json`.
+
+The 10-second soak smoke test constructed two populations with one million macro-classifiers each
+and 50 retained changes per rule, then copied them and ran a frozen matching decision. It completed
+under the 32 GiB heap. JFR showed 17.4 GiB used after a full collection and a temporary 32 GiB heap
+before that collection; the full compaction pause took 1.81 seconds during fixture construction.
+This is a setup and smoke result, not the required 60-minute stability test. The JFR recording is
+`app/build/soak.jfr`. The harness does not exercise HTTP latency or repeated SSE reconnects alongside
+those populations. Retained-heap behavior after warmup, long-run GC pauses, thread counts,
+HTTP/control p95, and two-second cancellation remain unmeasured.
+
+The jcstress quick run completed 84 configurations across progress publication and subscriber
+close/order tests with zero forbidden outcomes. It does not prove that no races exist. The regression
+suite and `spotlessCheck` pass. Run the full one-hour integrated soak and browser automation before
+release; parallel matching stays opt-in until its throughput gate passes on the target host.

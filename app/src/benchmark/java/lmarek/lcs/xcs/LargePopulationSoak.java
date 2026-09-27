@@ -33,7 +33,10 @@ public final class LargePopulationSoak {
         first.telemetry();
         var frozenA = first.deepCopy(new SplittableRandom(round));
         var frozenB = second.deepCopy(new SplittableRandom(round + 1));
-        if (frozenA.snapshots().size() != 1_000_000 || frozenB.snapshots().size() != 1_000_000) {
+        frozenA.match(state, java.util.List.of("a0"), false, java.util.Set.of());
+        frozenB.match(state, java.util.List.of("a0"), false, java.util.Set.of());
+        if (frozenA.telemetry().get("xcs.population.macro") != 1_000_000.0
+            || frozenB.telemetry().get("xcs.population.macro") != 1_000_000.0) {
           throw new AssertionError("Frozen evaluation copy lost residents");
         }
       }

@@ -146,10 +146,14 @@ final class XcsPopulation {
       }
     }
 
+    var rulesByAction = new HashMap<String, List<Rule>>();
+    for (var rule : matching) {
+      rulesByAction.computeIfAbsent(rule.actionId, ignored -> new ArrayList<>()).add(rule);
+    }
     var predictions = new LinkedHashMap<String, Double>();
     var actionRuleIds = new LinkedHashMap<String, List<Long>>();
     for (var action : legal) {
-      var actionRules = matching.stream().filter(rule -> rule.actionId.equals(action)).toList();
+      var actionRules = rulesByAction.getOrDefault(action, List.of());
       var fitnessSum = actionRules.stream().mapToDouble(rule -> rule.fitness).sum();
       var prediction =
           fitnessSum > 0.0
@@ -215,16 +219,7 @@ final class XcsPopulation {
       if (old != null) {
         errorSum += rule.predictionError - old.predictionError;
         fitnessSum += rule.fitness - old.fitness;
-        retainRuleChange(
-            rule.id,
-            new MetricChange(
-                nextEventSequence++,
-                iteration,
-                rule.id,
-                rule.parentIds,
-                old,
-                RuleMetrics.from(rule),
-                rule.numerosity));
+        retainRuleChange(rule.id, MetricChange.from(nextEventSequence++, iteration, rule, old));
       }
     }
   }
@@ -709,10 +704,37 @@ final class XcsPopulation {
       long iteration,
       long ruleId,
       List<Long> parents,
-      RuleMetrics before,
-      RuleMetrics after,
-      int numerosity)
+      double oldPrediction,
+      double prediction,
+      double oldError,
+      double error,
+      double oldFitness,
+      double fitness,
+      long oldExperience,
+      long experience,
+      int numerosity,
+      double oldActionSetSize,
+      double actionSetSize)
       implements RuleChange {
+    static MetricChange from(long sequence, long iteration, Rule rule, RuleMetrics before) {
+      return new MetricChange(
+          sequence,
+          iteration,
+          rule.id,
+          rule.parentIds,
+          before.prediction,
+          rule.prediction,
+          before.predictionError,
+          rule.predictionError,
+          before.fitness,
+          rule.fitness,
+          before.experience,
+          rule.experience,
+          rule.numerosity,
+          before.actionSetSize,
+          rule.actionSetSize);
+    }
+
     @Override
     public XcsEvolutionEvent event() {
       return new XcsEvolutionEvent(
@@ -723,17 +745,17 @@ final class XcsPopulation {
           parents,
           "prediction %s -> %s; error %s -> %s; fitness %s -> %s; experience %d -> %d; numerosity %d; action-set size %s -> %s"
               .formatted(
-                  before.prediction,
-                  after.prediction,
-                  before.predictionError,
-                  after.predictionError,
-                  before.fitness,
-                  after.fitness,
-                  before.experience,
-                  after.experience,
+                  oldPrediction,
+                  prediction,
+                  oldError,
+                  error,
+                  oldFitness,
+                  fitness,
+                  oldExperience,
+                  experience,
                   numerosity,
-                  before.actionSetSize,
-                  after.actionSetSize));
+                  oldActionSetSize,
+                  actionSetSize));
     }
   }
 

@@ -26,7 +26,9 @@ class ArenaWebTest {
 
       var options = send(client, "GET", "/api/arena/options", null);
       assertThat(options.statusCode()).isEqualTo(200);
-      assertThat(options.body()).contains("XCS", "MCTS", "RANDOM");
+      assertThat(options.body())
+          .contains(
+              "XCS", "MCTS", "RANDOM", "\"matchingWorkers\":1", "\"parallelThreshold\":32768");
 
       var beforeRun = send(client, "GET", "/api/arena/runs/current", null);
       assertThat(beforeRun.statusCode()).isEqualTo(404);

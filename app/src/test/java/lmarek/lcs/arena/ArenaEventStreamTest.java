@@ -10,6 +10,22 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(10)
 class ArenaEventStreamTest {
   @Test
+  void rejectsTheThirtyThirdSubscriber() {
+    var stream = new ArenaEventStream();
+    try {
+      for (int index = 0; index < 32; index++) {
+        stream.subscribe(new ArenaUpdate("run", index));
+      }
+      org.assertj.core.api.Assertions.assertThatThrownBy(
+              () -> stream.subscribe(new ArenaUpdate("run", 33)))
+          .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+          .hasMessageContaining("At most 32");
+    } finally {
+      stream.close();
+    }
+  }
+
+  @Test
   void pendingRevisionsCoalesceAndTerminalDrainsBeforeClose() throws Exception {
     var mailbox = new ArenaEventStream.Mailbox();
     mailbox.offer(new ArenaUpdate("run", 2));
