@@ -5,6 +5,7 @@ import lmarek.lcs.agent.DecisionContext;
 import lmarek.lcs.draughts.DraughtsGame;
 import lmarek.lcs.draughts.DraughtsMove;
 import lmarek.lcs.draughts.DraughtsState;
+import lmarek.lcs.xcs.DraughtsXcsEncoder;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Mode;
@@ -20,6 +21,7 @@ public class GameBenchmark {
   private final DraughtsState state = game.initialState();
   private final DecisionContext<DraughtsState, DraughtsMove> context =
       new DecisionContext<>(state, state.playerToMove(), game.legalMoves(state), 0, false, 1);
+  private final DraughtsXcsEncoder encoder = new DraughtsXcsEncoder();
   private final MctsAgent<DraughtsState, DraughtsMove> actual =
       new MctsAgent<>("a", "a", game, new MctsConfig(30, 30, MctsConfig.UCT_EXPLORATION), 1);
   private final ReferenceMctsAgent<DraughtsState, DraughtsMove> reference =
@@ -29,6 +31,11 @@ public class GameBenchmark {
   @Benchmark
   public Object analysis() {
     return game.analyze(state);
+  }
+
+  @Benchmark
+  public Object encode() {
+    return encoder.encode(state, state.playerToMove());
   }
 
   @Benchmark

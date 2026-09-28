@@ -247,6 +247,19 @@ are approximate stack-based attribution, not exact wall time. Short profiles may
 have no samples for cheap phases. Thread CPU load is reported as JFR recorded it;
 worker sample counts show whether the pool had useful work.
 
+### Draughts state encoding experiment (2026-09-28)
+
+The actor-relative XCS encoder now reads each of the four piece bitboards once
+per state and scans limited-endgame clocks once, while retaining the same 64
+categorical values. `DraughtsXcsEncoderTest` and the full application test suite
+pass. On the initial position, JMH `GameBenchmark.encode` rose from 1,321 ± 12
+to 1,386 ± 29 thousand encodes per second, while allocation fell from 6,144 to
+5,485 bytes per encoding. The 100k-rule full-speed fixture against RANDOM
+measured 1.356 ± 0.269 batches/s before and 1.401 ± 0.266 after at four game
+workers; those intervals overlap, so the end-to-end result is inconclusive.
+The focused encoder gain and absence of an end-to-end regression justify keeping
+this behavior-preserving change without claiming a full-game speedup.
+
 ## Verification
 
 The tests compare exact decisions, traces, rule snapshots, history entries and

@@ -14,6 +14,7 @@ import lmarek.lcs.draughts.LimitedEndgameClock;
 import lmarek.lcs.draughts.LimitedEndgameKind;
 import lmarek.lcs.draughts.PositionSignature;
 import lmarek.lcs.game.Player;
+import org.jspecify.annotations.Nullable;
 
 /** Actor-relative categorical encoding for 10x10 international draughts. */
 public final class DraughtsXcsEncoder implements StateActionEncoder<DraughtsState, DraughtsMove> {
@@ -22,12 +23,16 @@ public final class DraughtsXcsEncoder implements StateActionEncoder<DraughtsStat
   @Override
   public CategoricalState encode(DraughtsState state, Player perspective) {
     var values = new ArrayList<String>(64);
+    var selfMen = state.men(perspective);
+    var selfKings = state.kings(perspective);
+    var opponentMen = state.men(perspective.opponent());
+    var opponentKings = state.kings(perspective.opponent());
     for (var relativeSquare = 1;
         relativeSquare <= DraughtsBoard.PLAYABLE_SQUARES;
         relativeSquare++) {
-      var absoluteSquare =
-          perspective == Player.WHITE ? relativeSquare : DraughtsBoard.rotate(relativeSquare);
-      values.add(pieceAt(state, absoluteSquare, perspective));
+      var absoluteSquare = perspective == Player.WHITE ? relativeSquare : 51 - relativeSquare;
+      var bit = 1L << (absoluteSquare - 1);
+      values.add(pieceAt(bit, selfMen, selfKings, opponentMen, opponentKings));
     }
     values.add("TO_MOVE_" + (state.playerToMove() == perspective ? "SELF" : "OPPONENT"));
     values.add(repetitionContext(state, perspective));
@@ -41,14 +46,17 @@ public final class DraughtsXcsEncoder implements StateActionEncoder<DraughtsStat
             + (perspective == Player.WHITE
                 ? state.blackKingOnlyMoves()
                 : state.whiteKingOnlyMoves()));
-    for (var kind : LimitedEndgameKind.values()) {
-      addLimitedClockContext(
-          values,
-          kind,
-          state.limitedEndgameClocks().stream().filter(clock -> clock.kind() == kind).findFirst(),
-          perspective,
-          isKingAgainstKing(state));
+    @Nullable LimitedEndgameClock fiveMoveClock = null;
+    @Nullable LimitedEndgameClock sixteenMoveClock = null;
+    for (var clock : state.limitedEndgameClocks()) {
+      if (clock.kind() == LimitedEndgameKind.FIVE_MOVES) fiveMoveClock = clock;
+      else sixteenMoveClock = clock;
     }
+    var equalKingEnding = isKingAgainstKing(state);
+    addLimitedClockContext(
+        values, LimitedEndgameKind.FIVE_MOVES, fiveMoveClock, perspective, equalKingEnding);
+    addLimitedClockContext(
+        values, LimitedEndgameKind.SIXTEEN_MOVES, sixteenMoveClock, perspective, equalKingEnding);
     return new CategoricalState(values);
   }
 
@@ -75,18 +83,18 @@ public final class DraughtsXcsEncoder implements StateActionEncoder<DraughtsStat
     return Optional.ofNullable(legalActionMap(game, state, perspective).get(actionId));
   }
 
-  private static String pieceAt(DraughtsState state, int square, Player perspective) {
-    var bit = DraughtsBoard.bit(square);
-    if ((state.men(perspective) & bit) != 0) {
+  private static String pieceAt(
+      long bit, long selfMen, long selfKings, long opponentMen, long opponentKings) {
+    if ((selfMen & bit) != 0) {
       return "SELF_MAN";
     }
-    if ((state.kings(perspective) & bit) != 0) {
+    if ((selfKings & bit) != 0) {
       return "SELF_KING";
     }
-    if ((state.men(perspective.opponent()) & bit) != 0) {
+    if ((opponentMen & bit) != 0) {
       return "OPPONENT_MAN";
     }
-    if ((state.kings(perspective.opponent()) & bit) != 0) {
+    if ((opponentKings & bit) != 0) {
       return "OPPONENT_KING";
     }
     return "EMPTY";
@@ -95,11 +103,11 @@ public final class DraughtsXcsEncoder implements StateActionEncoder<DraughtsStat
   private static void addLimitedClockContext(
       List<String> values,
       LimitedEndgameKind kind,
-      Optional<LimitedEndgameClock> clock,
+      @Nullable LimitedEndgameClock clock,
       Player perspective,
       boolean equalKingEnding) {
     var prefix = "LIMITED_" + kind.name();
-    if (clock.isEmpty()) {
+    if (clock == null) {
       values.add(prefix + "_ACTIVE_FALSE");
       values.add(prefix + "_STRONGER_NONE");
       values.add(prefix + "_SELF_MOVES_NONE");
@@ -107,7 +115,7 @@ public final class DraughtsXcsEncoder implements StateActionEncoder<DraughtsStat
       values.add(prefix + "_EXTENSION_NONE");
       return;
     }
-    var active = clock.orElseThrow();
+    var active = clock;
     values.add(prefix + "_ACTIVE_TRUE");
     values.add(
         prefix
