@@ -35,3 +35,6 @@ build
 
 # IntelliJ IDEA stuff
 .idea
+
+jcstress-results.*
+app/data

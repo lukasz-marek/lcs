@@ -8,7 +8,9 @@ public record ArenaOptions(
     String defaultSeed,
     SettingOption evaluationInterval,
     SettingOption evaluationGames,
-    ArenaPerformance performance) {
+    ArenaPerformance performance,
+    List<String> trainingModes,
+    int availableTrainingWorkers) {
   public ArenaOptions(
       List<AgentKindOption> agentKinds,
       List<String> pacingModes,
@@ -24,8 +26,27 @@ public record ArenaOptions(
         ArenaPerformance.defaults());
   }
 
+  public ArenaOptions(
+      List<AgentKindOption> agentKinds,
+      List<String> pacingModes,
+      String defaultSeed,
+      SettingOption evaluationInterval,
+      SettingOption evaluationGames,
+      ArenaPerformance performance) {
+    this(
+        agentKinds,
+        pacingModes,
+        defaultSeed,
+        evaluationInterval,
+        evaluationGames,
+        performance,
+        List.of("STANDARD", "FULL_SPEED"),
+        Runtime.getRuntime().availableProcessors());
+  }
+
   public ArenaOptions {
     agentKinds = List.copyOf(agentKinds);
     pacingModes = List.copyOf(pacingModes);
+    trainingModes = List.copyOf(trainingModes);
   }
 }

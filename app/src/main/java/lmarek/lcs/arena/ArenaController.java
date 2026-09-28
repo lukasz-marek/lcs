@@ -30,6 +30,11 @@ public final class ArenaController {
     return arena.options();
   }
 
+  @GetMapping("/rule-sets")
+  java.util.List<XcsRuleSetStore.RuleSetInfo> ruleSets() {
+    return arena.ruleSets();
+  }
+
   @PostMapping("/runs")
   ResponseEntity<ArenaSnapshot> start(@RequestBody ArenaRunRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED).body(arena.start(request));

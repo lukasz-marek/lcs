@@ -22,6 +22,8 @@ public record ArenaSnapshot(
     Map<String, Map<String, Double>> telemetry,
     Map<String, Map<String, List<ChartPoint>>> charts,
     HistoryRevisions historyRevisions,
+    TrainingMode trainingMode,
+    int trainingWorkers,
     @Nullable String lastError) {
   public ArenaSnapshot {
     competitors = List.copyOf(competitors);

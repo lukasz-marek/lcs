@@ -31,6 +31,9 @@ final class XcsPopulation {
   private final Collection<Rule> rules = byId.values();
   private final Map<String, Map<Long, Rule>> byAction = new HashMap<>();
   private final Map<Structure, Map<Long, Rule>> byStructure = new HashMap<>();
+  private final List<Rule> indexedRules = new ArrayList<>();
+  private final Map<Long, Integer> rulePositions = new HashMap<>();
+  private final Map<Long, Integer> protectedReferences = new HashMap<>();
   private int microCount;
   private double generalitySum;
   private double errorSum;
@@ -43,6 +46,7 @@ final class XcsPopulation {
   private long iteration;
   private long coveringCount;
   private long gaCount;
+  private boolean sampledDeletion;
 
   XcsPopulation(XcsParameters parameters, RandomGenerator random) {
     this(
@@ -103,8 +107,147 @@ final class XcsPopulation {
     return copy;
   }
 
+  XcsPopulationSnapshot snapshotForPersistence() {
+    var savedRules =
+        rules.stream()
+            .map(
+                rule ->
+                    new XcsPopulationSnapshot.Classifier(
+                        rule.id,
+                        Arrays.stream(rule.condition)
+                            .map(term -> term == WILDCARD ? null : (String) term)
+                            .toList(),
+                        rule.actionId,
+                        rule.prediction,
+                        rule.predictionError,
+                        rule.fitness,
+                        rule.experience,
+                        rule.numerosity,
+                        rule.actionSetSize,
+                        rule.timestamp,
+                        rule.parentIds,
+                        rule.birthReason))
+            .toList();
+    var savedChanges = new LinkedHashMap<Long, List<XcsEvolutionEvent>>();
+    changesByRule.forEach(
+        (ruleId, changes) ->
+            savedChanges.put(ruleId, changes.stream().map(RuleChange::event).toList()));
+    return new XcsPopulationSnapshot(
+        XcsPopulationSnapshot.CURRENT_VERSION,
+        savedRules,
+        List.copyOf(events),
+        savedChanges,
+        nextRuleId,
+        nextEventSequence,
+        iteration,
+        coveringCount,
+        gaCount);
+  }
+
+  static XcsPopulation restore(
+      XcsParameters parameters, RandomGenerator random, XcsPopulationSnapshot snapshot) {
+    if (snapshot.version() != XcsPopulationSnapshot.CURRENT_VERSION) {
+      throw new IllegalArgumentException("Unsupported XCS population format version");
+    }
+    var restoredRules =
+        snapshot.classifiers().stream()
+            .map(
+                saved -> {
+                  var condition =
+                      saved.condition().stream()
+                          .map(term -> term == null ? WILDCARD : term)
+                          .toArray();
+                  return new Rule(
+                      saved.id(),
+                      condition,
+                      saved.actionId(),
+                      saved.prediction(),
+                      saved.predictionError(),
+                      saved.fitness(),
+                      saved.experience(),
+                      saved.numerosity(),
+                      saved.actionSetSize(),
+                      saved.timestamp(),
+                      saved.parentIds(),
+                      saved.birthReason());
+                })
+            .toList();
+    var events = new ArrayDeque<>(snapshot.events());
+    var changes = new LinkedHashMap<Long, Deque<RuleChange>>();
+    snapshot
+        .ruleChanges()
+        .forEach(
+            (ruleId, ruleEvents) -> {
+              var retained = new ArrayDeque<RuleChange>();
+              ruleEvents.forEach(event -> retained.addLast(new EventChange(event)));
+              changes.put(ruleId, retained);
+            });
+    var population =
+        new XcsPopulation(
+            parameters,
+            random,
+            restoredRules,
+            events,
+            changes,
+            snapshot.nextRuleId(),
+            snapshot.nextEventSequence(),
+            snapshot.iteration(),
+            snapshot.coveringCount(),
+            snapshot.gaCount());
+    population.verifyIndexes();
+    return population;
+  }
+
+  void restoreFrom(XcsPopulationSnapshot snapshot) {
+    var restored = restore(parameters, random, snapshot);
+    byId.clear();
+    byAction.clear();
+    byStructure.clear();
+    indexedRules.clear();
+    rulePositions.clear();
+    restored.rules.forEach(this::addRule);
+    events.clear();
+    events.addAll(restored.events);
+    changesByRule.clear();
+    restored.changesByRule.forEach(
+        (ruleId, changes) -> changesByRule.put(ruleId, new ArrayDeque<>(changes)));
+    nextRuleId = restored.nextRuleId;
+    nextEventSequence = restored.nextEventSequence;
+    iteration = restored.iteration;
+    coveringCount = restored.coveringCount;
+    gaCount = restored.gaCount;
+  }
+
   void matchingExecutor(MatchingExecutor executor) {
     matchingExecutor = executor;
+  }
+
+  void sampledDeletion(boolean enabled) {
+    sampledDeletion = enabled;
+  }
+
+  void retainReferences(Collection<Long> ruleIds) {
+    ruleIds.stream().distinct().forEach(id -> protectedReferences.merge(id, 1, Integer::sum));
+  }
+
+  void releaseReferences(Collection<Long> ruleIds) {
+    ruleIds.stream()
+        .distinct()
+        .forEach(
+            id -> {
+              var count = protectedReferences.get(id);
+              if (count == null) return;
+              if (count == 1) protectedReferences.remove(id);
+              else protectedReferences.put(id, count - 1);
+            });
+  }
+
+  Set<Long> protectedRuleIds() {
+    return Set.copyOf(protectedReferences.keySet());
+  }
+
+  int protectedReferenceCount() {
+    return protectedReferences.values().stream().mapToInt(Integer::intValue).sum();
   }
 
   long advanceIteration() {
@@ -124,13 +267,15 @@ final class XcsPopulation {
       throw new IllegalArgumentException("XCS needs at least one legal action");
     }
 
+    var protectedWithPending = new HashSet<>(protectedRuleIds);
+    protectedWithPending.addAll(this.protectedRuleIds());
     var matching = matchingRules(state, legal);
     var represented = new HashSet<String>();
     matching.forEach(rule -> represented.add(rule.actionId));
     var missing = legal.stream().filter(action -> !represented.contains(action)).toList();
     var unknown = cover ? List.<String>of() : missing;
     if (cover && !missing.isEmpty()) {
-      var protectedForCovering = new HashSet<>(protectedRuleIds);
+      var protectedForCovering = new HashSet<>(protectedWithPending);
       matching.forEach(rule -> protectedForCovering.add(rule.id));
       reserveCoveringSpace(missing.size(), protectedForCovering);
       for (var action : missing) {
@@ -234,6 +379,8 @@ final class XcsPopulation {
       CategoricalState nicheState,
       List<String> nicheLegalActions,
       Set<Long> protectedRuleIds) {
+    var protectedWithPending = new HashSet<>(protectedRuleIds);
+    protectedWithPending.addAll(this.protectedRuleIds());
     var actionSet = findRules(actionSetRuleIds);
     if (actionSet.isEmpty()) {
       return;
@@ -266,8 +413,8 @@ final class XcsPopulation {
     }
     mutate(childOne, nicheState, nicheLegalActions);
     mutate(childTwo, nicheState, nicheLegalActions);
-    insertOffspring(childOne, parentOne, parentTwo, protectedRuleIds);
-    insertOffspring(childTwo, parentOne, parentTwo, protectedRuleIds);
+    insertOffspring(childOne, parentOne, parentTwo, protectedWithPending);
+    insertOffspring(childTwo, parentOne, parentTwo, protectedWithPending);
   }
 
   List<XcsRuleSnapshot> snapshots() {
@@ -303,7 +450,8 @@ final class XcsPopulation {
         "xcs.predictionError", averageError,
         "xcs.fitness", averageFitness,
         "xcs.covering", (double) coveringCount,
-        "xcs.ga", (double) gaCount);
+        "xcs.ga", (double) gaCount,
+        "xcs.iteration", (double) iteration);
   }
 
   private List<Rule> matchingRules(CategoricalState state, Set<String> legalActions) {
@@ -535,11 +683,14 @@ final class XcsPopulation {
   }
 
   private void deleteOne(Set<Long> protectedRuleIds) {
-    var candidates = rules.stream().filter(rule -> isDeletable(rule, protectedRuleIds)).toList();
+    var candidates =
+        sampledDeletion && indexedRules.size() > 64
+            ? sampleDeletable(protectedRuleIds)
+            : rules.stream().filter(rule -> isDeletable(rule, protectedRuleIds)).toList();
     if (candidates.isEmpty()) {
       throw capacityException(1, protectedRuleIds);
     }
-    var populationFitness = rules.stream().mapToDouble(rule -> rule.fitness).sum();
+    var populationFitness = fitnessSum;
     var populationSize = microPopulationSize();
     var averageFitness = populationSize == 0 ? 0.0 : populationFitness / populationSize;
     var votes = new double[candidates.size()];
@@ -575,6 +726,19 @@ final class XcsPopulation {
     if (selected.numerosity == 0) {
       changesByRule.remove(selected.id);
     }
+  }
+
+  private List<Rule> sampleDeletable(Set<Long> protectedRuleIds) {
+    var selected = new LinkedHashMap<Long, Rule>();
+    int attempts = Math.min(indexedRules.size() * 8, 1_024);
+    for (int attempt = 0; attempt < attempts && selected.size() < 64; attempt++) {
+      var rule = indexedRules.get(random.nextInt(indexedRules.size()));
+      if (isDeletable(rule, protectedRuleIds)) selected.put(rule.id, rule);
+    }
+    if (selected.isEmpty()) {
+      return rules.stream().filter(rule -> isDeletable(rule, protectedRuleIds)).limit(64).toList();
+    }
+    return List.copyOf(selected.values());
   }
 
   private static boolean isDeletable(Rule rule, Set<Long> protectedRuleIds) {
@@ -682,6 +846,8 @@ final class XcsPopulation {
     generalitySum += rule.generality();
     errorSum += rule.predictionError;
     fitnessSum += rule.fitness;
+    rulePositions.put(rule.id, indexedRules.size());
+    indexedRules.add(rule);
   }
 
   private void removeRule(Rule rule) {
@@ -696,6 +862,12 @@ final class XcsPopulation {
     generalitySum -= rule.generality();
     errorSum -= rule.predictionError;
     fitnessSum -= rule.fitness;
+    var position = Objects.requireNonNull(rulePositions.remove(rule.id));
+    var last = indexedRules.remove(indexedRules.size() - 1);
+    if (position < indexedRules.size()) {
+      indexedRules.set(position, last);
+      rulePositions.put(last.id, position);
+    }
   }
 
   private interface RuleChange {

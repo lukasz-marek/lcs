@@ -56,6 +56,16 @@ final class ArenaConfigurationSchema {
     parseSeed(request.seed());
     validate(request.agentA(), "agentA");
     validate(request.agentB(), "agentB");
+    if (request.trainingMode() == TrainingMode.FULL_SPEED
+        && request.agentA().kind() != AgentKind.XCS
+        && request.agentB().kind() != AgentKind.XCS) {
+      throw new IllegalArgumentException(
+          "Full-speed training requires at least one XCS competitor");
+    }
+    if (request.trainingWorkers() != null
+        && request.trainingWorkers() > Runtime.getRuntime().availableProcessors()) {
+      throw new IllegalArgumentException("trainingWorkers exceeds available processors");
+    }
     EVALUATION_INTERVAL.validate(request.evaluationInterval(), "evaluationInterval");
     EVALUATION_GAMES.validate(request.evaluationGames(), "evaluationGames");
   }
@@ -83,6 +93,12 @@ final class ArenaConfigurationSchema {
     if (!definition.presets().contains(configuration.preset())) {
       throw new IllegalArgumentException(
           "%s.preset must be one of %s".formatted(path, definition.presets()));
+    }
+    if (configuration.ruleSet() != null) {
+      if (configuration.kind() != AgentKind.XCS) {
+        throw new IllegalArgumentException(path + ".ruleSet is only valid for XCS");
+      }
+      XcsRuleSetStore.validateName(configuration.ruleSet());
     }
     for (var entry : configuration.settings().entrySet()) {
       var setting = definition.settings().get(entry.getKey());

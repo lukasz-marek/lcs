@@ -19,6 +19,8 @@ public record ArenaLiveSnapshot(
     @Nullable CurrentGameView currentGame,
     Map<String, Map<String, Double>> telemetry,
     HistoryRevisions historyRevisions,
+    TrainingMode trainingMode,
+    int trainingWorkers,
     @Nullable String lastError) {
   static ArenaLiveSnapshot from(ArenaSnapshot snapshot) {
     return new ArenaLiveSnapshot(
@@ -35,6 +37,8 @@ public record ArenaLiveSnapshot(
         snapshot.currentGame(),
         snapshot.telemetry(),
         snapshot.historyRevisions(),
+        snapshot.trainingMode(),
+        snapshot.trainingWorkers(),
         snapshot.lastError());
   }
 }

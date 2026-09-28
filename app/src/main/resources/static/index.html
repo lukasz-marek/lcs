@@ -34,7 +34,7 @@
             <p class="kicker">MATCHMAKER</p>
             <h2 id="setup-heading">Build a rivalry</h2>
           </div>
-          <p class="section-note">Each run starts both competitors from scratch.</p>
+          <p class="section-note">Named XCS rule sets save after every training game and can resume against a new opponent.</p>
         </div>
 
         <div class="matchup-grid">
@@ -42,6 +42,7 @@
             <legend><span>A</span> Challenger</legend>
             <label>Method<span class="field-help" tabindex="0" role="note" data-tooltip="Choose how this competitor selects moves. XCS learns rules, UCT search compares simulated continuations, and Random picks uniformly from legal moves." aria-label="Help: Choose how this competitor selects moves. XCS learns rules, UCT search compares simulated continuations, and Random picks uniformly from legal moves."></span><select id="agent-a-kind"></select></label>
             <label>Preset<span class="field-help" tabindex="0" role="note" data-tooltip="Choose a bundled starting configuration. Advanced settings show its values and can be changed before starting." aria-label="Help: Choose a bundled starting configuration. Advanced settings show its values and can be changed before starting."></span><select id="agent-a-preset"></select></label>
+            <label id="agent-a-rule-set-label" class="rule-set-field" hidden>Saved rule set<span class="field-help" tabindex="0" role="note" data-tooltip="Choose an existing XCS population to resume or enter a name to create one. Saved settings from an existing population are reused." aria-label="Help: Choose an existing XCS population to resume or enter a name to create one."></span><div class="rule-set-autocomplete"><input id="agent-a-rule-set" maxlength="64" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="agent-a-rule-set-options" placeholder="Optional: name this population" /><ul id="agent-a-rule-set-options" class="rule-set-options" role="listbox" hidden></ul></div></label>
             <details>
               <summary>Advanced settings</summary>
               <div id="agent-a-advanced" class="advanced-grid"></div>
@@ -54,6 +55,7 @@
             <legend><span>B</span> Defender</legend>
             <label>Method<span class="field-help" tabindex="0" role="note" data-tooltip="Choose how this competitor selects moves. XCS learns rules, UCT search compares simulated continuations, and Random picks uniformly from legal moves." aria-label="Help: Choose how this competitor selects moves. XCS learns rules, UCT search compares simulated continuations, and Random picks uniformly from legal moves."></span><select id="agent-b-kind"></select></label>
             <label>Preset<span class="field-help" tabindex="0" role="note" data-tooltip="Choose a bundled starting configuration. Advanced settings show its values and can be changed before starting." aria-label="Help: Choose a bundled starting configuration. Advanced settings show its values and can be changed before starting."></span><select id="agent-b-preset"></select></label>
+            <label id="agent-b-rule-set-label" class="rule-set-field" hidden>Saved rule set<span class="field-help" tabindex="0" role="note" data-tooltip="Choose an existing XCS population to resume or enter a name to create one. Saved settings from an existing population are reused." aria-label="Help: Choose an existing XCS population to resume or enter a name to create one."></span><div class="rule-set-autocomplete"><input id="agent-b-rule-set" maxlength="64" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="agent-b-rule-set-options" placeholder="Optional: name this population" /><ul id="agent-b-rule-set-options" class="rule-set-options" role="listbox" hidden></ul></div></label>
             <details>
               <summary>Advanced settings</summary>
               <div id="agent-b-advanced" class="advanced-grid"></div>
@@ -80,6 +82,14 @@
           <label>
             Evaluation games<span class="field-help" tabindex="0" role="note" data-tooltip="Number of frozen games in each evaluation series. The even count gives both competitors the same number of games as White and Black." aria-label="Help: Number of frozen games in each evaluation series. The even count gives both competitors the same number of games as White and Black."></span>
             <input id="evaluation-games" type="number" value="20" min="2" step="2" />
+          </label>
+          <label>
+            Training mode
+            <select id="training-mode"></select>
+          </label>
+          <label id="training-workers-field" hidden>
+            CPU workers
+            <input id="training-workers" type="number" min="1" step="1" />
           </label>
           <div id="pacing-choice" class="pacing-choice" role="group" aria-label="Pacing"></div>
           <button id="start" class="primary" type="button">Start the arena <span>→</span></button>
@@ -111,6 +121,7 @@
             <span id="white-kind">—</span>
           </div>
           <p id="run-error" class="run-error" role="alert" hidden></p>
+          <p id="training-mode-note" class="training-mode-note">Standard training</p>
           <div id="move-caption" class="move-caption">The first move will appear here.</div>
         </article>
 

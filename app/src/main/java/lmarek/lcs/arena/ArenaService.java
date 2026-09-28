@@ -2,6 +2,7 @@ package lmarek.lcs.arena;
 
 import jakarta.annotation.PreDestroy;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -11,12 +12,21 @@ public final class ArenaService {
   private @Nullable ArenaRun current;
   private boolean replacing;
   private final ArenaPerformance performance;
+  private final @Nullable XcsRuleSetStore ruleSets;
 
+  @Autowired
   public ArenaService(
       @Value("${arena.performance.matching-workers:1}") int workers,
       @Value("${arena.performance.learning-workers:16}") int learningWorkers,
-      @Value("${arena.performance.parallel-threshold:32768}") int threshold) {
+      @Value("${arena.performance.parallel-threshold:32768}") int threshold,
+      XcsRuleSetStore ruleSets) {
     performance = new ArenaPerformance(workers, learningWorkers, threshold);
+    this.ruleSets = ruleSets;
+  }
+
+  ArenaService(int workers, int learningWorkers, int threshold) {
+    performance = new ArenaPerformance(workers, learningWorkers, threshold);
+    this.ruleSets = null;
   }
 
   public ArenaOptions options() {
@@ -27,7 +37,9 @@ public final class ArenaService {
         options.defaultSeed(),
         options.evaluationInterval(),
         options.evaluationGames(),
-        performance);
+        performance,
+        options.trainingModes(),
+        options.availableTrainingWorkers());
   }
 
   public ArenaSnapshot start(ArenaRunRequest request) {
@@ -42,7 +54,7 @@ public final class ArenaService {
     }
     try {
       if (previous != null) previous.close();
-      var run = new ArenaRun(request, performance);
+      var run = new ArenaRun(request, performance, ruleSets);
       synchronized (this) {
         current = run;
       }
@@ -54,6 +66,10 @@ public final class ArenaService {
         replacing = false;
       }
     }
+  }
+
+  public java.util.List<XcsRuleSetStore.RuleSetInfo> ruleSets() {
+    return ruleSets == null ? java.util.List.of() : ruleSets.list();
   }
 
   public ArenaSnapshot snapshot() {

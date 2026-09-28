@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import lmarek.lcs.game.GameOutcome;
 import lmarek.lcs.game.Player;
+import org.jspecify.annotations.Nullable;
 
 /** Run-local aggregates and bounded detail retained for the spectator UI. */
 final class ArenaHistory {
@@ -52,11 +53,22 @@ final class ArenaHistory {
       GameOutcome outcome,
       Map<String, Double> telemetryA,
       Map<String, Double> telemetryB) {
+    recordTrainingSummary(
+        replay, outcome, replay.whiteCompetitorId(), replay.turns().size(), telemetryA, telemetryB);
+  }
+
+  synchronized void recordTrainingSummary(
+      @Nullable GameReplay replay,
+      GameOutcome outcome,
+      String whiteCompetitorId,
+      int plies,
+      Map<String, Double> telemetryA,
+      Map<String, Double> telemetryB) {
     chartsRevision++;
     cachedCharts = null;
     trainingGames++;
-    totalTrainingPlies += replay.turns().size();
-    var result = resultForA(outcome, replay.whiteCompetitorId());
+    totalTrainingPlies += plies;
+    var result = resultForA(outcome, whiteCompetitorId);
     rolling.addLast(result);
     if (rolling.size() > ROLLING_WINDOW) {
       rolling.removeFirst();
@@ -71,7 +83,7 @@ final class ArenaHistory {
     series(resultSeries, "Draws").add(trainingGames, (double) draws);
     recordLearning("A", telemetryA);
     recordLearning("B", telemetryB);
-    retainReplay(replay);
+    if (replay != null) retainReplay(replay);
   }
 
   synchronized void recordEvaluationSeries(long atTrainingGame, double aScore, double bScore) {

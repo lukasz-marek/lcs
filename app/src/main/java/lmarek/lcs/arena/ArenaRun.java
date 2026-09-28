@@ -8,11 +8,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.SplittableRandom;
 import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import lmarek.lcs.agent.Agent;
 import lmarek.lcs.agent.PlayedTurn;
@@ -35,6 +38,8 @@ final class ArenaRun implements AutoCloseable {
 
   private final String id = UUID.randomUUID().toString();
   private final ArenaRunRequest request;
+  private final @Nullable XcsRuleSetStore ruleSets;
+  private final FullSpeedGameRunner fullSpeedGameRunner;
   private final MatchingExecutor matchingExecutor;
   private final Instant createdAt = Instant.now();
   private final DraughtsGame game = new DraughtsGame();
@@ -47,6 +52,7 @@ final class ArenaRun implements AutoCloseable {
   private final ArenaEventStream events = new ArenaEventStream();
   private final ExecutorService executor =
       Executors.newSingleThreadExecutor(Thread.ofVirtual().name("arena-" + id).factory());
+  private final @Nullable ThreadPoolExecutor fullSpeedPool;
   private final ScheduledExecutorService publicationScheduler =
       Executors.newSingleThreadScheduledExecutor(
           Thread.ofPlatform().daemon().name("arena-publication-" + id).factory());
@@ -67,23 +73,61 @@ final class ArenaRun implements AutoCloseable {
   private long displayedGames;
   private long revision;
   private long lastProgressPublicationNanos;
+  private long lastNamedCheckpointNanos = System.nanoTime();
+  private volatile long lastSuccessfulCheckpointMillis;
+  private long lastTelemetryNanos = System.nanoTime();
+  private double lastLearningIterations;
+  private double learningUpdatesPerSecond;
   private @Nullable ScheduledFuture<?> trailingPublication;
   private boolean publicationClosed;
 
   ArenaRun(ArenaRunRequest request) {
-    this(request, ArenaPerformance.defaults());
+    this(request, ArenaPerformance.defaults(), null);
   }
 
   ArenaRun(ArenaRunRequest request, ArenaPerformance performance) {
+    this(request, performance, null);
+  }
+
+  ArenaRun(
+      ArenaRunRequest request, ArenaPerformance performance, @Nullable XcsRuleSetStore ruleSets) {
+    this(request, performance, ruleSets, null);
+  }
+
+  ArenaRun(
+      ArenaRunRequest request,
+      ArenaPerformance performance,
+      @Nullable XcsRuleSetStore ruleSets,
+      @Nullable FullSpeedGameRunner fullSpeedGameRunner) {
     this.request = Objects.requireNonNull(request);
+    this.ruleSets = ruleSets;
+    this.fullSpeedGameRunner =
+        fullSpeedGameRunner == null ? this::runFullSpeedGame : fullSpeedGameRunner;
     ArenaConfigurationSchema.validate(request);
     pacing = request.pacing();
     var rootSeeds = new SplittableRandom(request.parsedSeed());
     matchingExecutor =
-        new MatchingExecutor(
-            performance.matchingWorkers(),
-            performance.learningWorkers(),
-            performance.parallelThreshold());
+        request.trainingMode() == TrainingMode.FULL_SPEED
+            ? MatchingExecutor.sequential()
+            : new MatchingExecutor(
+                performance.matchingWorkers(),
+                performance.learningWorkers(),
+                performance.parallelThreshold());
+    int fullSpeedWorkers =
+        request.trainingWorkers() == null
+            ? Runtime.getRuntime().availableProcessors()
+            : Math.min(request.trainingWorkers(), Runtime.getRuntime().availableProcessors());
+    fullSpeedPool =
+        request.trainingMode() == TrainingMode.FULL_SPEED
+            ? new ThreadPoolExecutor(
+                fullSpeedWorkers,
+                fullSpeedWorkers,
+                0,
+                TimeUnit.SECONDS,
+                new ArrayBlockingQueue<>(fullSpeedWorkers),
+                Thread.ofPlatform().name("arena-game-", 0).factory(),
+                new ThreadPoolExecutor.AbortPolicy())
+            : null;
     System.getLogger(ArenaRun.class.getName())
         .log(
             System.Logger.Level.INFO,
@@ -93,8 +137,30 @@ final class ArenaRun implements AutoCloseable {
             performance.learningWorkers(),
             performance.parallelThreshold());
     var factory = new DraughtsAgentFactory(game, matchingExecutor);
-    agentA = factory.create("A", request.agentA(), rootSeeds.nextLong());
-    agentB = factory.create("B", request.agentB(), rootSeeds.nextLong());
+    var savedA = loadRuleSet(request.agentA());
+    var savedB = loadRuleSet(request.agentB());
+    if (request.agentA().ruleSet() != null
+        && request.agentA().ruleSet().equals(request.agentB().ruleSet())) {
+      throw new IllegalArgumentException("A rule set can be assigned to only one competitor");
+    }
+    agentA =
+        factory.create(
+            "A",
+            request.agentA(),
+            rootSeeds.nextLong(),
+            savedA == null ? null : savedA.parameters(),
+            savedA == null ? null : savedA.population());
+    agentB =
+        factory.create(
+            "B",
+            request.agentB(),
+            rootSeeds.nextLong(),
+            savedB == null ? null : savedB.parameters(),
+            savedB == null ? null : savedB.population());
+    if (request.trainingMode() == TrainingMode.FULL_SPEED) {
+      enableSampledDeletion(agentA);
+      enableSampledDeletion(agentB);
+    }
     competitors = List.of(competitorView(agentA), competitorView(agentB));
     evaluationSeeds = rootSeeds.split();
     capturedTelemetry = captureTelemetry();
@@ -209,7 +275,8 @@ final class ArenaRun implements AutoCloseable {
     try {
       while (!stopRequested) {
         checkpoint();
-        playTrainingGame();
+        if (fullSpeedPool == null) playTrainingGame();
+        else playFullSpeedBatch();
         if ((agentA.learns() || agentB.learns())
             && history.trainingGames() % request.evaluationIntervalValue() == 0) {
           playEvaluationSeries();
@@ -228,13 +295,151 @@ final class ArenaRun implements AutoCloseable {
       finishFailed(exception);
     } finally {
       matchingExecutor.close();
+      if (fullSpeedPool != null) {
+        fullSpeedPool.shutdownNow();
+        awaitFullSpeedWorkers(fullSpeedPool);
+      }
       workerThread = null;
       executor.shutdown();
       publicationScheduler.shutdownNow();
     }
   }
 
+  void playFullSpeedBatch() {
+    var pool = Objects.requireNonNull(fullSpeedPool);
+    long completedBeforeBatch = history.trainingGames();
+    int untilEvaluation =
+        request.evaluationIntervalValue()
+            - (int) (completedBeforeBatch % request.evaluationIntervalValue());
+    int count = Math.min(pool.getCorePoolSize(), untilEvaluation);
+    var futures = new ArrayList<Future<FullSpeedGame>>();
+    for (int index = 0; index < count; index++) {
+      long trainingNumber = completedBeforeBatch + index + 1;
+      long gameNumber = ++displayedGames;
+      futures.add(pool.submit(() -> fullSpeedGameRunner.run(gameNumber, trainingNumber)));
+    }
+    var results = new ArrayList<FullSpeedGame>();
+    try {
+      for (var future : futures) results.add(future.get());
+    } catch (InterruptedException exception) {
+      futures.forEach(future -> future.cancel(true));
+      pool.shutdownNow();
+      awaitFullSpeedWorkers(pool);
+      Thread.currentThread().interrupt();
+      throw new CancellationException("Full-speed training batch interrupted");
+    } catch (java.util.concurrent.ExecutionException exception) {
+      futures.forEach(future -> future.cancel(true));
+      pool.shutdownNow();
+      awaitFullSpeedWorkers(pool);
+      var cause = exception.getCause();
+      if (cause instanceof RuntimeException runtime) throw runtime;
+      throw new IllegalStateException("Full-speed game worker failed", cause);
+    }
+
+    for (var result : results) {
+      long trainingNumber = history.trainingGames() + 1;
+      var telemetry = captureTelemetry();
+      history.recordTrainingSummary(
+          result.replay(),
+          result.outcome(),
+          result.whiteId(),
+          result.plies(),
+          Objects.requireNonNull(telemetry.get("A")),
+          Objects.requireNonNull(telemetry.get("B")));
+      capturedTelemetry = telemetry;
+      collectEvolution("A", agentA, trainingNumber);
+      collectEvolution("B", agentB, trainingNumber);
+    }
+    long now = System.nanoTime();
+    if (now - lastNamedCheckpointNanos >= TimeUnit.SECONDS.toNanos(60)) {
+      persistRuleSets();
+      lastNamedCheckpointNanos = now;
+    }
+    currentGame = null;
+    publishProgress();
+  }
+
+  private static void awaitFullSpeedWorkers(ThreadPoolExecutor pool) {
+    boolean interrupted = Thread.interrupted();
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    try {
+      while (!pool.isTerminated()) {
+        try {
+          if (!pool.awaitTermination(
+              Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS)) {
+            throw new IllegalStateException(
+                "Full-speed game workers did not stop within five seconds");
+          }
+        } catch (InterruptedException exception) {
+          interrupted = true;
+        }
+      }
+    } finally {
+      if (interrupted) Thread.currentThread().interrupt();
+    }
+  }
+
+  private FullSpeedGame runFullSpeedGame(long gameNumber, long trainingNumber) {
+    long gameSeed = mixSeed(request.parsedSeed() ^ trainingNumber);
+    boolean aIsWhite = trainingNumber % 2 == 1;
+    var whiteTemplate = aIsWhite ? agentA : agentB;
+    var blackTemplate = aIsWhite ? agentB : agentA;
+    var white = episodeAgent(whiteTemplate, aIsWhite ? "A" : "B", mixSeed(gameSeed));
+    var black = episodeAgent(blackTemplate, aIsWhite ? "B" : "A", mixSeed(gameSeed + 1));
+    var turns = gameNumber % 100 == 0 ? new ArrayList<ReplayTurn>() : null;
+    var result =
+        runner.run(
+            white,
+            black,
+            gameNumber,
+            true,
+            turn -> {
+              if (turns != null) turns.add(replayTurn(turn, white, black));
+            });
+    GameReplay replay = null;
+    if (turns != null) {
+      var winner = winnerIdentity(result.outcome(), white.id());
+      replay =
+          new GameReplay(
+              gameNumber,
+              false,
+              white.id(),
+              black.id(),
+              BoardView.from(result.initialState()),
+              turns,
+              winner == null ? "Draw" : winner + " win",
+              result.outcome().reason().name());
+    }
+    return new FullSpeedGame(result.outcome(), white.id(), result.turns().size(), replay);
+  }
+
+  @SuppressWarnings("unchecked")
+  private Agent<DraughtsState, DraughtsMove> episodeAgent(
+      Agent<DraughtsState, DraughtsMove> template, String id, long seed) {
+    if (template instanceof lmarek.lcs.xcs.XcsAgent<?, ?> xcs) {
+      return ((lmarek.lcs.xcs.XcsAgent<DraughtsState, DraughtsMove>) xcs).sharedEpisode(seed);
+    }
+    var configuration = id.equals("A") ? request.agentA() : request.agentB();
+    return new DraughtsAgentFactory(game, matchingExecutor).create(id, configuration, seed);
+  }
+
+  private static long mixSeed(long value) {
+    value = (value ^ (value >>> 30)) * 0xbf58476d1ce4e5b9L;
+    value = (value ^ (value >>> 27)) * 0x94d049bb133111ebL;
+    return value ^ (value >>> 31);
+  }
+
+  private static void enableSampledDeletion(Agent<?, ?> agent) {
+    if (agent instanceof lmarek.lcs.xcs.XcsAgent<?, ?> xcs) xcs.sampledDeletion(true);
+  }
+
   private void finishStopped() {
+    try {
+      persistRuleSets();
+    } catch (RuntimeException exception) {
+      finishFailed(exception);
+      return;
+    }
     refreshLearningProgress(history.trainingGames() + 1);
     captureProgress();
     status = RunStatus.STOPPED;
@@ -259,10 +464,36 @@ final class ArenaRun implements AutoCloseable {
         completed.outcome(),
         Objects.requireNonNull(telemetry.get("A")),
         Objects.requireNonNull(telemetry.get("B")));
+    persistRuleSets();
     capturedTelemetry = telemetry;
     collectEvolution("A", agentA, trainingNumber);
     collectEvolution("B", agentB, trainingNumber);
     publishProgress();
+  }
+
+  private XcsRuleSetStore.@Nullable SavedRuleSet loadRuleSet(AgentConfiguration configuration) {
+    if (configuration.ruleSet() == null) return null;
+    if (ruleSets == null) {
+      throw new IllegalStateException("XCS rule-set persistence is unavailable");
+    }
+    return ruleSets.load(configuration.ruleSet());
+  }
+
+  private void persistRuleSets() {
+    if (ruleSets == null) return;
+    persistRuleSet(request.agentA(), agentA);
+    persistRuleSet(request.agentB(), agentB);
+    lastSuccessfulCheckpointMillis = System.currentTimeMillis();
+  }
+
+  private void persistRuleSet(
+      AgentConfiguration configuration, Agent<DraughtsState, DraughtsMove> agent) {
+    if (configuration.ruleSet() == null) return;
+    if (!(agent instanceof lmarek.lcs.xcs.XcsAgent<?, ?> xcs)) {
+      throw new IllegalStateException("Named rule sets require an XCS agent");
+    }
+    Objects.requireNonNull(ruleSets)
+        .save(configuration.ruleSet(), xcs.parameters(), xcs.populationSnapshot());
   }
 
   private void playEvaluationSeries() {
@@ -416,6 +647,7 @@ final class ArenaRun implements AutoCloseable {
         throw new StopRequestedException();
       }
       if (pauseRequested && status == RunStatus.PAUSING) {
+        if (request.trainingMode() == TrainingMode.FULL_SPEED) persistRuleSets();
         status = RunStatus.PAUSED;
         publishNow(false);
       }
@@ -543,13 +775,38 @@ final class ArenaRun implements AutoCloseable {
         captured.telemetry(),
         historyView.charts(),
         historyView.historyRevisions(),
+        request.trainingMode(),
+        fullSpeedPool == null ? 1 : fullSpeedPool.getCorePoolSize(),
         lastError);
   }
 
   private Map<String, Map<String, Double>> captureTelemetry() {
+    var metricsA = Map.copyOf(agentA.telemetry().metrics());
+    var metricsB = Map.copyOf(agentB.telemetry().metrics());
+    double iterations =
+        metricsA.getOrDefault("xcs.iteration", 0.0) + metricsB.getOrDefault("xcs.iteration", 0.0);
+    long now = System.nanoTime();
+    double elapsed = Math.max(0.001, (now - lastTelemetryNanos) / 1_000_000_000.0);
+    learningUpdatesPerSecond = Math.max(0.0, iterations - lastLearningIterations) / elapsed;
+    lastTelemetryNanos = now;
+    lastLearningIterations = iterations;
+    var runtime = Runtime.getRuntime();
+    double cpu =
+        java.lang.management.ManagementFactory.getOperatingSystemMXBean()
+                instanceof com.sun.management.OperatingSystemMXBean processBean
+            ? Math.max(0.0, processBean.getProcessCpuLoad())
+            : 0.0;
     return Map.of(
-        "A", Map.copyOf(agentA.telemetry().metrics()),
-        "B", Map.copyOf(agentB.telemetry().metrics()));
+        "A", metricsA,
+        "B", metricsB,
+        "run",
+            Map.of(
+                "training.workers",
+                    (double) (fullSpeedPool == null ? 1 : fullSpeedPool.getCorePoolSize()),
+                "training.updatesPerSecond", learningUpdatesPerSecond,
+                "process.cpu", cpu,
+                "heap.used", (double) (runtime.totalMemory() - runtime.freeMemory()),
+                "checkpoint.epochMillis", (double) lastSuccessfulCheckpointMillis));
   }
 
   private static CompetitorView competitorView(Agent<?, ?> agent) {
@@ -630,6 +887,14 @@ final class ArenaRun implements AutoCloseable {
       ArenaHistoryView history) {}
 
   private record CompletedGame(GameReplay replay, GameOutcome outcome) {}
+
+  record FullSpeedGame(
+      GameOutcome outcome, String whiteId, int plies, @Nullable GameReplay replay) {}
+
+  @FunctionalInterface
+  interface FullSpeedGameRunner {
+    FullSpeedGame run(long gameNumber, long trainingNumber);
+  }
 
   private static final class StopRequestedException extends RuntimeException {}
 }

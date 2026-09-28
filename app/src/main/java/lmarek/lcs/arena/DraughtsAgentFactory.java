@@ -13,6 +13,8 @@ import lmarek.lcs.xcs.DraughtsXcsEncoder;
 import lmarek.lcs.xcs.MatchingExecutor;
 import lmarek.lcs.xcs.XcsAgent;
 import lmarek.lcs.xcs.XcsParameters;
+import lmarek.lcs.xcs.XcsPopulationSnapshot;
+import org.jspecify.annotations.Nullable;
 
 final class DraughtsAgentFactory {
   private final DraughtsGame game;
@@ -25,18 +27,36 @@ final class DraughtsAgentFactory {
 
   Agent<DraughtsState, DraughtsMove> create(
       String id, AgentConfiguration configuration, long seed) {
+    return create(id, configuration, seed, null, null);
+  }
+
+  Agent<DraughtsState, DraughtsMove> create(
+      String id,
+      AgentConfiguration configuration,
+      long seed,
+      @Nullable XcsParameters savedParameters,
+      @Nullable XcsPopulationSnapshot population) {
     var displayName = id.equals("A") ? "Challenger A" : "Defender B";
     return switch (configuration.kind()) {
       case RANDOM -> new RandomAgent<>(id, displayName, seed);
       case MCTS -> createMcts(id, displayName, configuration, seed);
       case XCS ->
-          new XcsAgent<>(
-              id,
-              displayName,
-              new DraughtsXcsEncoder(),
-              xcsParameters(configuration),
-              seed,
-              matchingExecutor);
+          population == null
+              ? new XcsAgent<>(
+                  id,
+                  displayName,
+                  new DraughtsXcsEncoder(),
+                  xcsParameters(configuration),
+                  seed,
+                  matchingExecutor)
+              : XcsAgent.restore(
+                  id,
+                  displayName,
+                  new DraughtsXcsEncoder(),
+                  java.util.Objects.requireNonNull(savedParameters),
+                  seed,
+                  matchingExecutor,
+                  java.util.Objects.requireNonNull(population));
     };
   }
 

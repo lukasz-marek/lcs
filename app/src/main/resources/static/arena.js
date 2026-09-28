@@ -8,6 +8,7 @@ const ui = {
   toast: document.querySelector("#toast"),
   chart: document.querySelector("#main-chart"),
   pacing: document.querySelector("#pacing-choice"),
+  trainingMode: document.querySelector("#training-mode"),
   replayPicker: document.querySelector("#replay-picker"),
   replaySlider: document.querySelector("#replay-slider"),
   replayPlay: document.querySelector("#replay-play"),
@@ -45,6 +46,7 @@ const PRESET_HELP = {
 
 const state = {
   options: null,
+  ruleSets: [],
   snapshot: null,
   pacing: "LIVE",
   chart: "results",
@@ -234,6 +236,8 @@ function setupAgent(side) {
       PRESET_HELP[preset.value] ||
       `Preset: ${preset.selectedOptions[0]?.textContent || preset.value}.`;
     renderAdvanced(current);
+    document.querySelector(`#agent-${side}-rule-set-label`).hidden = current.id !== "XCS";
+    syncSavedRuleSetSettings(side);
   };
 
   preset.addEventListener("change", () => {
@@ -246,7 +250,92 @@ function setupAgent(side) {
     }
   });
   kind.addEventListener("change", refresh);
+  setupRuleSetAutocomplete(side);
   refresh();
+}
+
+function setupRuleSetAutocomplete(side) {
+  const input = document.querySelector(`#agent-${side}-rule-set`);
+  const list = document.querySelector(`#agent-${side}-rule-set-options`);
+  let activeIndex = -1;
+  let matches = [];
+
+  const close = () => {
+    list.hidden = true;
+    input.setAttribute("aria-expanded", "false");
+    input.removeAttribute("aria-activedescendant");
+    activeIndex = -1;
+  };
+  const choose = (saved) => {
+    input.value = saved.name;
+    syncSavedRuleSetSettings(side);
+    close();
+  };
+  const render = () => {
+    const query = input.value.trim().toLocaleLowerCase();
+    matches = state.ruleSets.filter((saved) => saved.name.toLocaleLowerCase().includes(query));
+    list.replaceChildren(
+      ...matches.map((saved, index) => {
+        const item = document.createElement("li");
+        item.id = `${list.id}-option-${index}`;
+        item.setAttribute("role", "option");
+        item.setAttribute("aria-selected", String(index === activeIndex));
+        item.classList.toggle("active", index === activeIndex);
+        const name = document.createElement("strong");
+        name.textContent = saved.name;
+        const details = document.createElement("small");
+        details.textContent = `${saved.rules.toLocaleString()} rules · ${saved.iterations.toLocaleString()} decisions`;
+        item.append(name, details);
+        item.addEventListener("mousedown", (event) => event.preventDefault());
+        item.addEventListener("click", () => choose(saved));
+        return item;
+      }),
+    );
+    if (matches.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "rule-set-empty";
+      empty.textContent = query ? "No saved rule set matches. Press Enter to use this as a new name." : "No saved rule sets yet. Enter a name to create one.";
+      empty.setAttribute("aria-live", "polite");
+      list.append(empty);
+    }
+    list.hidden = false;
+    input.setAttribute("aria-expanded", "true");
+  };
+
+  input.addEventListener("focus", render);
+  input.addEventListener("input", () => {
+    activeIndex = -1;
+    syncSavedRuleSetSettings(side);
+    render();
+  });
+  input.addEventListener("blur", () => setTimeout(close, 120));
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      close();
+    } else if (event.key === "ArrowDown" && matches.length > 0) {
+      event.preventDefault();
+      activeIndex = (activeIndex + 1) % matches.length;
+      render();
+      input.setAttribute("aria-activedescendant", `${list.id}-option-${activeIndex}`);
+    } else if (event.key === "ArrowUp" && matches.length > 0) {
+      event.preventDefault();
+      activeIndex = (activeIndex - 1 + matches.length) % matches.length;
+      render();
+      input.setAttribute("aria-activedescendant", `${list.id}-option-${activeIndex}`);
+    } else if (event.key === "Enter" && !list.hidden) {
+      event.preventDefault();
+      if (activeIndex >= 0 && matches[activeIndex]) choose(matches[activeIndex]);
+      else close();
+    }
+  });
+}
+
+function syncSavedRuleSetSettings(side) {
+  const name = document.querySelector(`#agent-${side}-rule-set`).value.trim();
+  const isSaved = state.ruleSets.some((saved) => saved.name === name);
+  document.querySelectorAll(`#agent-${side}-advanced input`).forEach((input) => {
+    input.disabled = isSaved;
+  });
 }
 
 function agentRequest(side) {
@@ -262,6 +351,7 @@ function agentRequest(side) {
     kind: kindId,
     preset: document.querySelector(`#agent-${side}-preset`).value,
     settings,
+    ruleSet: document.querySelector(`#agent-${side}-rule-set`).value.trim() || null,
   };
 }
 
@@ -299,12 +389,26 @@ function setupPacing() {
 }
 
 async function loadOptions() {
-  state.options = await json("/api/arena/options");
+  [state.options, state.ruleSets] = await Promise.all([
+    json("/api/arena/options"),
+    json("/api/arena/rule-sets"),
+  ]);
   setupAgent("a");
   setupAgent("b");
   document.querySelector("#seed").value = state.options.defaultSeed;
   applySetting(document.querySelector("#evaluation-interval"), state.options.evaluationInterval);
   applySetting(document.querySelector("#evaluation-games"), state.options.evaluationGames);
+  ui.trainingMode.replaceChildren(
+    ...state.options.trainingModes.map((mode) => {
+      const option = document.createElement("option");
+      option.value = mode;
+      option.textContent = mode === "FULL_SPEED" ? "Train at full speed" : "Standard";
+      return option;
+    }),
+  );
+  document.querySelector("#training-workers").value = state.options.availableTrainingWorkers;
+  ui.trainingMode.addEventListener("change", syncTrainingMode);
+  syncTrainingMode();
   setupPacing();
   scheduleRender();
 }
@@ -336,7 +440,17 @@ function startRequest() {
       document.querySelector("#evaluation-games"),
       state.options.evaluationGames,
     ),
+    trainingMode: ui.trainingMode.value,
+    trainingWorkers:
+      ui.trainingMode.value === "FULL_SPEED"
+        ? Number(document.querySelector("#training-workers").value)
+        : null,
   };
+}
+
+function syncTrainingMode() {
+  document.querySelector("#training-workers-field").hidden =
+    ui.trainingMode.value !== "FULL_SPEED";
 }
 
 async function startRun() {
@@ -379,6 +493,11 @@ async function command(name, method = "POST", body = null) {
     });
     if (epoch !== state.epoch || state.snapshot?.runId !== runId) return;
     acceptSnapshot(snapshot);
+    if (name === "stop") {
+      state.ruleSets = await json("/api/arena/rule-sets");
+      syncSavedRuleSetSettings("a");
+      syncSavedRuleSetSettings("b");
+    }
   } catch (error) {
     if (epoch === state.epoch && state.snapshot?.runId === runId) {
       showToast(error.message);
@@ -721,6 +840,8 @@ function renderStatusAndControls(snapshot) {
   error.textContent = snapshot?.lastError || "";
   const status = snapshot?.status;
   ui.start.disabled = !state.options || state.startPending || ACTIVE_STATUSES.has(status);
+  ui.trainingMode.disabled = ACTIVE_STATUSES.has(status) || state.startPending;
+  document.querySelector("#training-workers").disabled = ACTIVE_STATUSES.has(status) || state.startPending;
   ui.pause.disabled = !CONTROLLABLE_STATUSES.has(status);
   ui.stop.disabled = !CONTROLLABLE_STATUSES.has(status);
   ui.pause.textContent = status === "PAUSED" || status === "PAUSING" ? "Resume" : "Pause";
@@ -733,6 +854,11 @@ function render() {
   if (!snapshot) return;
 
   setText("training-count", `${snapshot.trainingGames} games`);
+  const checkpointMillis = Number(snapshot.telemetry?.run?.["checkpoint.epochMillis"] || 0);
+  document.querySelector("#training-mode-note").textContent =
+    snapshot.trainingMode === "FULL_SPEED"
+      ? `Full speed · ${snapshot.trainingWorkers} workers · ${Number(snapshot.telemetry?.run?.["training.updatesPerSecond"] || 0).toFixed(0)} updates/s · ${(Number(snapshot.telemetry?.run?.["process.cpu"] || 0) * 100).toFixed(0)}% CPU · ${(Number(snapshot.telemetry?.run?.["heap.used"] || 0) / 1073741824).toFixed(1)} GiB heap · detailed replay every 100 games${checkpointMillis ? ` · saved ${new Date(checkpointMillis).toLocaleTimeString()}` : ""}`
+      : "Standard training";
   setText("a-wins", snapshot.statistics?.aWins ?? 0);
   setText("b-wins", snapshot.statistics?.bWins ?? 0);
   setText("draws", snapshot.statistics?.draws ?? 0);

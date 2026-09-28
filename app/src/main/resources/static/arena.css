@@ -16,6 +16,7 @@
 }
 
 * { box-sizing: border-box; }
+html, body { max-width: 100%; overflow-x: clip; }
 body { margin: 0; background: var(--paper); color: var(--ink); min-width: 320px; }
 body::before { content: ""; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at 15% 0%, #29424755, transparent 34%), radial-gradient(circle at 90% 12%, #612d2a33, transparent 30%); }
 .noise { position: fixed; inset: 0; pointer-events: none; opacity: .17; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.12'/%3E%3C/svg%3E"); }
@@ -47,6 +48,7 @@ main { max-width: 1480px; margin: 0 auto; padding: 24px 34px 60px; }
 label { display: block; color: #bbb; font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; }
 label > select, label > input { display: block; margin-top: 6px; }
 select, input { width: 100%; border: 1px solid #454b4e; background: #111416; color: var(--ink); padding: 10px; font: 500 .85rem sans-serif; outline: none; }
+select, input { min-width: 0; max-width: 100%; }
 select:focus, input:focus { border-color: var(--cyan); box-shadow: 0 0 0 2px #47d7d022; }
 .field-help { position: relative; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 6px; border: 1px solid #687477; border-radius: 50%; color: var(--cyan); font: 700 10px/1 sans-serif; letter-spacing: 0; text-transform: none; vertical-align: 1px; cursor: help; }
 .field-help::before { content: "?"; }
@@ -54,10 +56,22 @@ select:focus, input:focus { border-color: var(--cyan); box-shadow: 0 0 0 2px #47
 .field-help:hover::after, .field-help:focus-visible::after { opacity: 1; visibility: visible; }
 .field-help:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 details { grid-column: 1/-1; border-top: 1px solid var(--line); padding-top: 10px; }
+.rule-set-field { grid-column: 1/-1; }
+.rule-set-field[hidden] { display: none; }
+.rule-set-autocomplete { position: relative; margin-top: 6px; }
+.rule-set-autocomplete input { margin-top: 0; }
+.rule-set-options { position: absolute; z-index: 30; top: calc(100% + 4px); right: 0; left: 0; max-height: 240px; overflow-y: auto; margin: 0; padding: 5px; border: 1px solid #485457; background: #111719; box-shadow: 0 10px 28px #000b; list-style: none; }
+.rule-set-options[hidden] { display: none; }
+.rule-set-options li[role="option"] { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px; color: var(--ink); cursor: pointer; }
+.rule-set-options li[role="option"]:hover, .rule-set-options li[role="option"].active { background: #223034; }
+.rule-set-options li strong { font-size: .78rem; font-weight: 650; }
+.rule-set-options li small { color: var(--muted); font-size: .68rem; text-align: right; }
+.rule-set-options .rule-set-empty { padding: 11px 10px; color: var(--muted); font-size: .72rem; line-height: 1.4; }
 summary { cursor: pointer; color: var(--muted); font-size: .72rem; }
 .advanced-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; }
 .versus { display: grid; place-items: center; }.versus span { display: grid; place-items: center; width: 46px; height: 46px; border: 1px solid var(--gold); color: var(--gold); border-radius: 50%; font: 800 .8rem Georgia, serif; transform: rotate(-8deg); }
 .run-options { display: grid; grid-template-columns: 1fr 1fr 1fr auto minmax(190px,auto); gap: 14px; align-items: end; margin-top: 18px; }
+.run-options > * { min-width: 0; }
 button { border: 0; color: inherit; font: 700 .74rem sans-serif; letter-spacing: .05em; cursor: pointer; }
 button:disabled { opacity: .35; cursor: default; }
 .primary { height: 40px; padding: 0 18px; background: var(--coral); color: #1a1110; text-transform: uppercase; }.primary:hover { filter: brightness(1.1); }
@@ -106,4 +120,14 @@ footer { max-width: 1480px; margin: auto; padding: 22px 34px 35px; border-top: 1
 .condition-cell { overflow: hidden; text-overflow: ellipsis; }
 @media (prefers-reduced-motion: reduce) {
   .piece, .status-dot.running { animation: none; transition: none; }
+}
+.training-mode-note {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+#training-workers-field[hidden] {
+  display: none;
 }

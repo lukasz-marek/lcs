@@ -15,6 +15,11 @@ public final class PopulationFixture {
   /** Seed sparse or dense classifiers for full-game population pressure measurements. */
   public static void seedAgent(Object agent, int size, boolean dense)
       throws ReflectiveOperationException {
+    seedAgent(agent, size, size, dense);
+  }
+
+  public static void seedAgent(Object agent, int size, int maximumPopulation, boolean dense)
+      throws ReflectiveOperationException {
     var field = XcsAgent.class.getDeclaredField("population");
     field.setAccessible(true);
     var original = (XcsPopulation) field.get(agent);
@@ -31,7 +36,16 @@ public final class PopulationFixture {
     var seeded =
         (XcsPopulation)
             (dense
-                ? create(false, size, actionIds.size(), 1, true, false, actionIds, attributes)
+                ? create(
+                    false,
+                    size,
+                    maximumPopulation,
+                    actionIds.size(),
+                    1,
+                    true,
+                    false,
+                    actionIds,
+                    attributes)
                 : create(false, size, 1000, 1, false, false));
     seeded.matchingExecutor((MatchingExecutor) executor.get(original));
     field.set(agent, seeded);
@@ -56,10 +70,25 @@ public final class PopulationFixture {
       List<String> actionIds,
       int attributes)
       throws ReflectiveOperationException {
+    return create(
+        baseline, size, size, actions, numerosity, highMatch, histories, actionIds, attributes);
+  }
+
+  private static Object create(
+      boolean baseline,
+      int size,
+      int maximumPopulation,
+      int actions,
+      int numerosity,
+      boolean highMatch,
+      boolean histories,
+      List<String> actionIds,
+      int attributes)
+      throws ReflectiveOperationException {
     var defaults = XcsParameters.defaults();
     var parameters =
         new XcsParameters(
-            size,
+            maximumPopulation,
             defaults.beta(),
             defaults.gamma(),
             .5,
