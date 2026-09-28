@@ -3,18 +3,22 @@
 `arena.performance.learning-workers` (environment variable
 `ARENA_PERFORMANCE_LEARNING_WORKERS`) defaults to **16** and accepts **1–16**. Matching workers accept **1–15**.
 `GET /api/arena/options` exposes the effective `performance.learningWorkers`.
-The shared run-owned pool contains at most `max(matchingWorkers, learningWorkers)`
-threads. Each phase uses its own worker limit. Both phases use
-`parallel-threshold` (default 32,768 candidate/action-set rules).
+Outside full-speed mode, matching and learning share a run-owned pool containing
+at most `max(matchingWorkers, learningWorkers)` threads. Each phase uses its own
+worker limit. Both phases use `parallel-threshold` (default 32,768
+candidate/action-set rules). In full-speed mode, the matching pool uses up to
+`min(trainingWorkers, 15)` workers and update calculations remain sequential.
 
-Training games, evaluation games, UCT simulations, action selection, covering,
+Standard training and evaluation games are sequential; full-speed mode runs
+games concurrently. Inside a shared XCS population, action selection, covering,
 random draws, genetic operations, deletion and subsumption remain sequential.
-Workers calculate prediction, error, action-set size and accuracy into disjoint
-scratch arrays. The owner sums accuracy in ascending rule-ID order, then commits
-rule state, fitness, history and metrics in that order. No rule is changed before
-all calculations finish. Agent inspection retains the existing agent monitor.
-Cancellation joins actual worker exits before returning; shutdown also cancels
-queued futures so their callers can finish.
+Workers calculate matching results and, outside full-speed mode, prediction,
+error, action-set size and accuracy into disjoint scratch arrays. The owner sums
+accuracy in ascending rule-ID order, then commits rule state, fitness, history
+and metrics in that order. No rule is changed before all calculations finish.
+Agent inspection retains the existing agent monitor. Cancellation joins actual
+worker exits before returning; shutdown also cancels queued futures so their
+callers can finish.
 
 ## Measurements (2026-09-27)
 
@@ -127,9 +131,36 @@ materially change full-game throughput in these fixtures.
 
 Run benchmark processes sequentially to avoid CPU contention. For release
 qualification use at least three forks, five warmup and five measurement
-iterations, and repeat with representative saved/trained populations. Require
-at least 20% full-game improvement on large populations and no more than 10%
-regression on small populations when evaluating performance. The current default of 16 learning workers was explicitly requested after these measurements.
+iterations, and repeat with representative saved/trained populations. The
+current target is at least 50% more complete training games per second on large
+populations, with no more than 10% regression on small populations. The current
+default of 16 learning workers was explicitly requested after these measurements.
+
+### Full-speed matching experiment (2026-09-28)
+
+A one-fork JFR profile of the 100k dense fixture against RANDOM recorded 452
+matching/covering samples, 25 genetics/deletion samples, 10 learning-update
+samples, and 163 other/runtime samples. The benchmark fixture uses wildcard
+rules and is not a trained population. The profile supported testing full-speed
+matching, which had previously been forced to one worker.
+
+The change gives matching up to the configured full-speed game-worker count
+(capped at 15); learning updates stay sequential. Three forks with five one-
+second warmup and measurement iterations produced:
+
+| Game workers | Matching workers | Baseline games/s | Experiment games/s | Change |
+|---:|---:|---:|---:|---:|
+| 1 | 1 | 3.26 | 3.26 | baseline |
+| 4 | 4 | 3.09 | 3.79 | +22.7% |
+| 8 | 8 | 2.46 | 3.03 | +23.1% |
+
+Games/second is JMH batch throughput multiplied by games per batch. This
+experiment improves throughput at four and eight workers, but its best result
+is still below the single-worker baseline and far short of the 50% target. It
+remains as the first incremental change while the next experiment targets the
+matching and population data path. The benchmark JSON files are
+`app/build/xcs-experiment-baseline.json` and
+`app/build/xcs-parallel-matching.json`.
 
 ```sh
 ./gradlew benchmarks -PbenchmarkArgs='PopulationBenchmark.update -p size=10000,100000,1000000 -p implementation=parallel -p workers=1,2,4,8,15 -p actions=1 -p numerosity=1 -p highMatch=true -p histories=false -f 3 -wi 5 -i 5 -w 1s -r 1s -bm thrpt,sample -prof gc -rf json -rff build/learning-update.json'

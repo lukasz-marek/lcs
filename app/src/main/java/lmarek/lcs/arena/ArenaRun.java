@@ -106,17 +106,18 @@ final class ArenaRun implements AutoCloseable {
     ArenaConfigurationSchema.validate(request);
     pacing = request.pacing();
     var rootSeeds = new SplittableRandom(request.parsedSeed());
-    matchingExecutor =
-        request.trainingMode() == TrainingMode.FULL_SPEED
-            ? MatchingExecutor.sequential()
-            : new MatchingExecutor(
-                performance.matchingWorkers(),
-                performance.learningWorkers(),
-                performance.parallelThreshold());
     int fullSpeedWorkers =
         request.trainingWorkers() == null
             ? Runtime.getRuntime().availableProcessors()
             : Math.min(request.trainingWorkers(), Runtime.getRuntime().availableProcessors());
+    int matchingWorkers =
+        request.trainingMode() == TrainingMode.FULL_SPEED
+            ? Math.min(fullSpeedWorkers, 15)
+            : performance.matchingWorkers();
+    int learningWorkers =
+        request.trainingMode() == TrainingMode.FULL_SPEED ? 1 : performance.learningWorkers();
+    matchingExecutor =
+        new MatchingExecutor(matchingWorkers, learningWorkers, performance.parallelThreshold());
     fullSpeedPool =
         request.trainingMode() == TrainingMode.FULL_SPEED
             ? new ThreadPoolExecutor(
@@ -133,8 +134,8 @@ final class ArenaRun implements AutoCloseable {
             System.Logger.Level.INFO,
             "Arena {0}: matching workers={1}, learning workers={2}, threshold={3}",
             id,
-            performance.matchingWorkers(),
-            performance.learningWorkers(),
+            matchingWorkers,
+            learningWorkers,
             performance.parallelThreshold());
     var factory = new DraughtsAgentFactory(game, matchingExecutor);
     var savedA = loadRuleSet(request.agentA());
