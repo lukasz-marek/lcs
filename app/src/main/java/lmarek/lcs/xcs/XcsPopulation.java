@@ -837,6 +837,13 @@ final class XcsPopulation {
   }
 
   private void addRule(Rule rule) {
+    rule.fullyGeneral = true;
+    for (var term : rule.condition) {
+      if (term != WILDCARD) {
+        rule.fullyGeneral = false;
+        break;
+      }
+    }
     byId.put(rule.id, rule);
     byAction.computeIfAbsent(rule.actionId, ignored -> new LinkedHashMap<>()).put(rule.id, rule);
     byStructure
@@ -974,6 +981,7 @@ final class XcsPopulation {
   private static final class Rule {
     private final long id;
     private final Object[] condition;
+    private boolean fullyGeneral;
     private String actionId;
     private double prediction;
     private double predictionError;
@@ -1031,6 +1039,9 @@ final class XcsPopulation {
     private boolean matches(CategoricalState state) {
       if (condition.length != state.values().size()) {
         return false;
+      }
+      if (fullyGeneral) {
+        return true;
       }
       for (var index = 0; index < condition.length; index++) {
         if (condition[index] != WILDCARD && !condition[index].equals(state.values().get(index))) {

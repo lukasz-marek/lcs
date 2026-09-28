@@ -144,23 +144,29 @@ samples, and 163 other/runtime samples. The benchmark fixture uses wildcard
 rules and is not a trained population. The profile supported testing full-speed
 matching, which had previously been forced to one worker.
 
-The change gives matching up to the configured full-speed game-worker count
-(capped at 15); learning updates stay sequential. Three forks with five one-
-second warmup and measurement iterations produced:
+The first change gives matching up to the configured full-speed game-worker
+count (capped at 15); learning updates stay sequential. A second change caches
+whether a rule is fully general when it enters the population, so matching skips
+the per-attribute scan for wildcard-only rules. Three forks with five one-second
+warmup and measurement iterations produced:
 
-| Game workers | Matching workers | Baseline games/s | Experiment games/s | Change |
+| Game/matching workers | Baseline games/s | Parallel matching | Plus general-rule fast path | Cumulative change |
 |---:|---:|---:|---:|---:|
-| 1 | 1 | 3.26 | 3.26 | baseline |
-| 4 | 4 | 3.09 | 3.79 | +22.7% |
-| 8 | 8 | 2.46 | 3.03 | +23.1% |
+| 1 | 3.26 | 3.26 | 3.26 | baseline |
+| 4 | 3.09 | 3.79 | 4.29 | +38.8% |
+| 8 | 2.46 | 3.03 | 3.30 | +34.4% |
 
 Games/second is JMH batch throughput multiplied by games per batch. This
-experiment improves throughput at four and eight workers, but its best result
-is still below the single-worker baseline and far short of the 50% target. It
-remains as the first incremental change while the next experiment targets the
-matching and population data path. The benchmark JSON files are
-`app/build/xcs-experiment-baseline.json` and
-`app/build/xcs-parallel-matching.json`.
+benchmark seeds every classifier with a wildcard condition, so it stresses the
+fast path and does not represent a trained population. A separate one-fork JFR
+recording showed `Rule.matches` in 230 baseline stack samples and 36 samples
+after the fast path; treat that as diagnostic evidence, not a reliable speedup
+estimate. The best result is about 32% above the one-worker baseline, still short
+of the 50% target. The changes remain while the next experiment targets
+candidate-list construction. Benchmark JSON files are
+`app/build/xcs-experiment-baseline.json`,
+`app/build/xcs-parallel-matching.json`, and
+`app/build/xcs-fast-general-rules.json`.
 
 ```sh
 ./gradlew benchmarks -PbenchmarkArgs='PopulationBenchmark.update -p size=10000,100000,1000000 -p implementation=parallel -p workers=1,2,4,8,15 -p actions=1 -p numerosity=1 -p highMatch=true -p histories=false -f 3 -wi 5 -i 5 -w 1s -r 1s -bm thrpt,sample -prof gc -rf json -rff build/learning-update.json'
