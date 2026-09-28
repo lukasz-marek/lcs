@@ -150,23 +150,36 @@ whether a rule is fully general when it enters the population, so matching skips
 the per-attribute scan for wildcard-only rules. Three forks with five one-second
 warmup and measurement iterations produced:
 
-| Game/matching workers | Baseline games/s | Parallel matching | Plus general-rule fast path | Cumulative change |
+| Game workers | Sequential matching | Plus parallel matching | Plus general-rule fast path | Plus cursor heap |
 |---:|---:|---:|---:|---:|
-| 1 | 3.26 | 3.26 | 3.26 | baseline |
-| 4 | 3.09 | 3.79 | 4.29 | +38.8% |
-| 8 | 2.46 | 3.03 | 3.30 | +34.4% |
+| 1 | 3.26 | 3.26 | 3.26 | 3.26 |
+| 4 | 3.09 | 3.79 | 4.29 | 4.49 |
+| 8 | 2.46 | 3.03 | 3.30 | 3.58 |
 
 Games/second is JMH batch throughput multiplied by games per batch. This
 benchmark seeds every classifier with a wildcard condition, so it stresses the
 fast path and does not represent a trained population. A separate one-fork JFR
 recording showed `Rule.matches` in 230 baseline stack samples and 36 samples
 after the fast path; treat that as diagnostic evidence, not a reliable speedup
-estimate. The best result is about 32% above the one-worker baseline, still short
-of the 50% target. The changes remain while the next experiment targets
-candidate-list construction. Benchmark JSON files are
+estimate. The best result is 38% above the one-worker baseline, and the eight-
+worker result is 10% above it. Relative to sequential matching at the same game
+worker count, the combined four- and eight-worker results are 45% and 46%
+higher. The 50% target is not met.
+
+The cursor-heap change reuses one mutable cursor per legal action instead of
+allocating one cursor per candidate rule. On the one-million-rule, 50-legal-
+action matching kernel, three forks measured 0.198 ± 0.007 matches/ms and
+13.26 MB/op before, versus 0.219 ± 0.012 matches/ms and 11.66 MB/op after.
+That is a 10.6% kernel throughput gain and 12.1% less allocation. The full-game
+change from the preceding experiment is smaller and noisy, so the kernel result
+supports keeping this focused allocation reduction without claiming it meets
+the end-to-end target. The next full-game experiment targets the covering
+capacity scan identified in the profile. Benchmark JSON files are
 `app/build/xcs-experiment-baseline.json`,
 `app/build/xcs-parallel-matching.json`, and
-`app/build/xcs-fast-general-rules.json`.
+`app/build/xcs-fast-general-rules.json`,
+`app/build/xcs-cursor-heap.json`, and
+`app/build/heap-current-million-kernel.json`.
 
 ```sh
 ./gradlew benchmarks -PbenchmarkArgs='PopulationBenchmark.update -p size=10000,100000,1000000 -p implementation=parallel -p workers=1,2,4,8,15 -p actions=1 -p numerosity=1 -p highMatch=true -p histories=false -f 3 -wi 5 -i 5 -w 1s -r 1s -bm thrpt,sample -prof gc -rf json -rff build/learning-update.json'

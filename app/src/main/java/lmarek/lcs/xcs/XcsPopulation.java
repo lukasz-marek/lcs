@@ -4,7 +4,6 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -15,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.random.RandomGenerator;
 
@@ -455,24 +453,59 @@ final class XcsPopulation {
   }
 
   private List<Rule> matchingRules(CategoricalState state, Set<String> legalActions) {
-    var cursors =
-        new PriorityQueue<RuleCursor>(Comparator.comparingLong(cursor -> cursor.rule().id));
+    var cursors = new RuleCursor[legalActions.size()];
+    var cursorCount = 0;
     for (var action : legalActions) {
       var bucket = byAction.get(action);
       if (bucket != null && !bucket.isEmpty()) {
         var iterator = bucket.values().iterator();
-        cursors.add(new RuleCursor(iterator, iterator.next()));
+        cursorCount = offerCursor(cursors, cursorCount, new RuleCursor(iterator, iterator.next()));
       }
     }
     var candidates = new ArrayList<Rule>();
-    while (!cursors.isEmpty()) {
-      var cursor = cursors.remove();
-      candidates.add(cursor.rule());
+    while (cursorCount > 0) {
+      var cursor = cursors[0];
+      candidates.add(cursor.rule);
       if (cursor.iterator().hasNext()) {
-        cursors.add(new RuleCursor(cursor.iterator(), cursor.iterator().next()));
+        cursor.rule = cursor.iterator.next();
+        siftCursorHeap(cursors, cursorCount, 0);
+      } else {
+        cursorCount--;
+        if (cursorCount > 0) {
+          cursors[0] = cursors[cursorCount];
+          cursors[cursorCount] = null;
+          siftCursorHeap(cursors, cursorCount, 0);
+        }
       }
     }
     return matchingExecutor.filter(candidates, rule -> rule.matches(state));
+  }
+
+  private static int offerCursor(RuleCursor[] heap, int size, RuleCursor cursor) {
+    var index = size++;
+    while (index > 0) {
+      var parent = (index - 1) >>> 1;
+      if (heap[parent].rule.id <= cursor.rule.id) break;
+      heap[index] = heap[parent];
+      index = parent;
+    }
+    heap[index] = cursor;
+    return size;
+  }
+
+  private static void siftCursorHeap(RuleCursor[] heap, int size, int index) {
+    var cursor = heap[index];
+    while (true) {
+      var left = index * 2 + 1;
+      if (left >= size) break;
+      var child = left;
+      var right = left + 1;
+      if (right < size && heap[right].rule.id < heap[left].rule.id) child = right;
+      if (cursor.rule.id <= heap[child].rule.id) break;
+      heap[index] = heap[child];
+      index = child;
+    }
+    heap[index] = cursor;
   }
 
   private Rule coveredRule(CategoricalState state, String action) {
@@ -826,7 +859,19 @@ final class XcsPopulation {
     }
   }
 
-  private record RuleCursor(Iterator<Rule> iterator, Rule rule) {}
+  private static final class RuleCursor {
+    private final Iterator<Rule> iterator;
+    private Rule rule;
+
+    private RuleCursor(Iterator<Rule> iterator, Rule rule) {
+      this.iterator = iterator;
+      this.rule = rule;
+    }
+
+    private Iterator<Rule> iterator() {
+      return iterator;
+    }
+  }
 
   private static final Object WILDCARD = new Object();
 
