@@ -293,3 +293,120 @@ Additional repeated populations verify ordered updates through history rollover.
 Lifecycle tests cover cancellation, worker failure, queued-task shutdown,
 inspection while learning and unchanged state after an interrupted calculation.
 Configuration tests verify the worker limits and effective options.
+
+### Full-speed population sharding and deletion (2026-09-28)
+
+The existing full-speed mode remains the default shared-population policy. An
+internal benchmark policy adds one persistent XCS population per game worker.
+Each shard starts from the same population snapshot, with a deterministic
+worker-specific random stream. Training game `n` goes to slot
+`(n - 1) mod worker-count`; batches contain at most one game per slot. In
+sharded mode, matching within each population is sequential, so game workers do
+not compete for a nested matching pool.
+
+At each evaluation checkpoint, every shard is scored on the same deterministic,
+color-balanced validation games against the checkpoint's promoted opponent
+snapshot. If both competitors use XCS, both sides are scored against the
+opponent snapshots from before promotion. Highest score wins; equal scores keep
+the lowest worker index. The winning population snapshot is copied to every
+shard before training resumes. The separate displayed evaluation series runs
+after promotion. Named rule sets persist the latest promoted snapshot, including
+when training stops between batches. No public configuration option was added;
+the policy can only be selected by internal benchmark/test code.
+
+The following JMH measurements compare four game workers against RANDOM, with
+sampled deletion enabled, sparse synthetic populations and the same fixture for
+both policies. Each benchmark operation completes four training games. They use
+three forks and five one-second warmup and measurement iterations. The JMH
+99.9% throughput intervals are shown after converting batches/second to
+games/second:
+
+| Initial rules | Shared games/s (99.9% CI) | Sharded games/s (99.9% CI) | Gain | Allocation / four-game batch, shared → sharded |
+|---:|---:|---:|---:|---:|
+| 10k | 27.15 (24.85–29.44) | 74.13 (64.91–83.34) | +173% | 112.2 → 93.0 MB |
+| 100k | 26.99 (24.76–29.21) | 73.46 (64.44–82.48) | +172% | 113.8 → 93.8 MB |
+
+The throughput intervals do not overlap and exceed the 50% target. Batch
+sample-time means were 148 ms shared and 54 ms sharded at 10k, and 148 ms and
+55 ms at 100k. A separate one-fork JFR diagnostic on the 100k fixture recorded
+5,038 shared and 16,341 sharded decisions: median decision latency was 1.203 ms
+shared and 0.369 ms sharded; p95 was 3.823 ms and 1.014 ms. The diagnostic
+records each decision and adds profiling overhead, so these values describe
+latency samples rather than the uninstrumented throughput runs. JMH's GC
+profiler recorded 18/113 ms (count/total pause) for shared and 10/258 ms for
+sharded at 100k. Sharding allocates fewer bytes per training game, while its
+higher game rate leads to more allocation and pause time over the same wall
+clock interval.
+
+These throughput fixtures are synthetic and do not establish the trained-model
+acceptance target on their own. The quality experiment trains both policies
+from the same empty population, against the same random opponent, with the same
+four-worker game budget and seed; it then compares color-balanced held-out
+games with paired random-opponent seeds. A 5,000-game held-out run scored
+shared 0.491 and sharded 0.496, a paired +0.54 percentage-point difference
+(95% CI −1.14 to +2.22); the quality guard passed. The trained populations had
+358,534 shared and 90,170 sharded rules. An initial 1,000-game run had a
+−1.95-point estimate with a wider interval (−5.56 to +1.66), which motivated
+the larger paired sample.
+
+The quality task saves the trained shared model as `shared-trained-start` in
+`app/build/sharding-quality-fixtures` for the representative-population
+benchmark.
+
+The trained shared snapshot had 358,773 rules. Three forks with five one-second
+warmup and measurement iterations against RANDOM measured 1.499 ± 0.082 shared
+and 2.329 ± 0.118 sharded batches/second. At four training games per batch,
+that is 6.00 games/second (99.9% CI 5.67–6.32) versus 9.32 (8.85–9.79), a
+55.4% mean gain with non-overlapping intervals. The trained-population batch
+latency means were 665 ms shared and 442 ms sharded; p50 was 661 ms and 446 ms,
+and p95 was 732 ms and 511 ms. Allocation fell from 307.1 MB to 292.6 MB per
+four-game batch. Across the 15 throughput measurement iterations, JMH recorded
+7 GCs / 19 ms total pause for shared and 4 / 42 ms for sharded. The absolute
+pause totals are small; the profile did not show a GC pause reduction.
+
+A separate one-fork JFR profile on that trained fixture recorded 569 shared
+and 1,082 sharded decisions. Mean decision time was 15.05 ms shared and 8.18
+ms sharded; p50 was 13.58 ms and 7.62 ms, and p95 was 34.58 ms and 18.70 ms.
+This event-based diagnostic adds profiling overhead and is not used for the
+throughput estimate. Together, the trained-population throughput clears the
+50% target; the 10k synthetic comparison remains the small-population
+non-regression check.
+
+For trained-model throughput, pass
+`-PshardingFixtureDirectory=build/sharding-quality-fixtures` and select
+`-p populationFixture=TRAINED`. The benchmark restores the same trained shared
+snapshot into the shared learner and each shard.
+
+Deletion profiling at 100k rules found `XcsPopulation.isDeletable` in 19.13% of
+CPU samples, while `LinkedHashMap` candidate-node allocation accounted for
+about 1.57%. Replacing candidate deduplication with an insertion-ordered list
+and membership set changed full-game throughput from 10.176 ± 0.783 to
+10.367 ± 0.659 games/second and allocation from 202.8 to 202.3 MB/game. The
+intervals overlap and the mean gain is about 1.9%, below the 10% retention
+threshold. The candidate was discarded; `sampleDeletable` still uses the
+original `LinkedHashMap` implementation.
+
+Raw JMH outputs are `app/build/sharding-small.json`,
+`app/build/sharding-large.json`, `app/build/sharding-decision-latency.json`,
+`app/build/sharding-trained-large.json`,
+`app/build/sharding-trained-decision-latency.json`,
+`app/build/deletion-complete-baseline.json`, and
+`app/build/deletion-complete-candidate.json`. Decision events are in
+`app/build/sharding-decision-jfr/` and
+`app/build/sharding-trained-decision-jfr/`. The deletion hotspot profile is
+synthetic and diagnostic; it does not establish that deletion is the dominant
+cost in a trained game.
+
+Reproduce the throughput comparison with:
+
+```sh
+./gradlew benchmarks -PbenchmarkArgs='FullSpeedTrainingBenchmark.trainingBatch -p size=10000,100000 -p workers=4 -p opponent=RANDOM -p populationPolicy=SHARED,SHARDED -p dense=false -p measureDecisionLatency=false -p populationFixture=SYNTHETIC -f 3 -wi 5 -i 5 -w 1s -r 1s -bm thrpt,sample -prof gc -rf json -rff build/sharding-throughput.json'
+./gradlew shardingQuality -PshardingTrainingGames=1000 -PshardingHeldOutGames=5000 -PshardingWorkers=4 -PshardingFixtureDirectory=build/sharding-quality-fixtures
+./gradlew benchmarks -PshardingFixtureDirectory=build/sharding-quality-fixtures -PbenchmarkArgs='FullSpeedTrainingBenchmark.trainingBatch -p size=100000 -p workers=4 -p opponent=RANDOM -p populationPolicy=SHARED,SHARDED -p dense=false -p measureDecisionLatency=false -p populationFixture=TRAINED -f 3 -wi 5 -i 5 -w 1s -r 1s -bm thrpt,sample -prof gc -rf json -rff build/sharding-trained-large.json'
+```
+
+The decision-latency recording is separate from throughput runs:
+
+```sh
+./gradlew benchmarks -PbenchmarkArgs='FullSpeedTrainingBenchmark.trainingBatch -p size=100000 -p workers=4 -p opponent=RANDOM -p populationPolicy=SHARED,SHARDED -p dense=false -p measureDecisionLatency=true -p populationFixture=SYNTHETIC -f 1 -wi 1 -i 1 -w 1s -r 2s -bm sample -prof jfr:dir=build/sharding-decision-jfr'
+```

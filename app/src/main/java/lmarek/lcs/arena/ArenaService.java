@@ -53,7 +53,9 @@ public final class ArenaService {
       previous = current;
     }
     try {
-      if (previous != null) previous.close();
+      // Terminal runs publish their final state before their run loop finishes executor cleanup.
+      // Let that loop finish teardown without making the next start wait for it.
+      if (previous != null && previous.isActive()) previous.close();
       var run = new ArenaRun(request, performance, ruleSets);
       synchronized (this) {
         current = run;

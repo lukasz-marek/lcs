@@ -27,7 +27,9 @@ import lmarek.lcs.game.GameOutcome;
 import lmarek.lcs.game.GameRunner;
 import lmarek.lcs.game.Player;
 import lmarek.lcs.xcs.MatchingExecutor;
+import lmarek.lcs.xcs.XcsAgent;
 import lmarek.lcs.xcs.XcsInspectable;
+import lmarek.lcs.xcs.XcsPopulationSnapshot;
 import org.jspecify.annotations.Nullable;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -39,14 +41,17 @@ final class ArenaRun implements AutoCloseable {
   private final String id = UUID.randomUUID().toString();
   private final ArenaRunRequest request;
   private final @Nullable XcsRuleSetStore ruleSets;
+  private final FullSpeedPopulationPolicy fullSpeedPopulationPolicy;
   private final FullSpeedGameRunner fullSpeedGameRunner;
   private final MatchingExecutor matchingExecutor;
   private final Instant createdAt = Instant.now();
   private final DraughtsGame game = new DraughtsGame();
   private final GameRunner<DraughtsState, DraughtsMove> runner =
       new GameRunner<>(game, MAXIMUM_GAME_PLIES);
-  private final Agent<DraughtsState, DraughtsMove> agentA;
-  private final Agent<DraughtsState, DraughtsMove> agentB;
+  private volatile Agent<DraughtsState, DraughtsMove> agentA;
+  private volatile Agent<DraughtsState, DraughtsMove> agentB;
+  private final List<XcsAgent<DraughtsState, DraughtsMove>> shardsA = new ArrayList<>();
+  private final List<XcsAgent<DraughtsState, DraughtsMove>> shardsB = new ArrayList<>();
   private final List<CompetitorView> competitors;
   private final ArenaHistory history = new ArenaHistory(createdAt);
   private final ArenaEventStream events = new ArenaEventStream();
@@ -59,6 +64,8 @@ final class ArenaRun implements AutoCloseable {
   private final Object control = new Object();
   private final Object publication = new Object();
   private final SplittableRandom evaluationSeeds;
+  private @Nullable XcsPopulationSnapshot promotedSnapshotA;
+  private @Nullable XcsPopulationSnapshot promotedSnapshotB;
   private final Map<String, Long> evolutionSequences = new HashMap<>();
   private volatile RunStatus status = RunStatus.RUNNING;
   private volatile Pacing pacing;
@@ -99,11 +106,25 @@ final class ArenaRun implements AutoCloseable {
       ArenaPerformance performance,
       @Nullable XcsRuleSetStore ruleSets,
       @Nullable FullSpeedGameRunner fullSpeedGameRunner) {
+    this(request, performance, ruleSets, fullSpeedGameRunner, FullSpeedPopulationPolicy.SHARED);
+  }
+
+  ArenaRun(
+      ArenaRunRequest request,
+      ArenaPerformance performance,
+      @Nullable XcsRuleSetStore ruleSets,
+      @Nullable FullSpeedGameRunner fullSpeedGameRunner,
+      FullSpeedPopulationPolicy fullSpeedPopulationPolicy) {
     this.request = Objects.requireNonNull(request);
     this.ruleSets = ruleSets;
+    this.fullSpeedPopulationPolicy = Objects.requireNonNull(fullSpeedPopulationPolicy);
     this.fullSpeedGameRunner =
         fullSpeedGameRunner == null ? this::runFullSpeedGame : fullSpeedGameRunner;
     ArenaConfigurationSchema.validate(request);
+    if (fullSpeedPopulationPolicy == FullSpeedPopulationPolicy.SHARDED
+        && request.trainingMode() != TrainingMode.FULL_SPEED) {
+      throw new IllegalArgumentException("Sharded populations require full-speed training");
+    }
     pacing = request.pacing();
     var rootSeeds = new SplittableRandom(request.parsedSeed());
     int fullSpeedWorkers =
@@ -112,7 +133,9 @@ final class ArenaRun implements AutoCloseable {
             : Math.min(request.trainingWorkers(), Runtime.getRuntime().availableProcessors());
     int matchingWorkers =
         request.trainingMode() == TrainingMode.FULL_SPEED
-            ? Math.min(fullSpeedWorkers, 15)
+            ? fullSpeedPopulationPolicy == FullSpeedPopulationPolicy.SHARDED
+                ? 1
+                : Math.min(fullSpeedWorkers, 15)
             : performance.matchingWorkers();
     int learningWorkers =
         request.trainingMode() == TrainingMode.FULL_SPEED ? 1 : performance.learningWorkers();
@@ -162,6 +185,11 @@ final class ArenaRun implements AutoCloseable {
       enableSampledDeletion(agentA);
       enableSampledDeletion(agentB);
     }
+    if (fullSpeedPopulationPolicy == FullSpeedPopulationPolicy.SHARDED) {
+      initializeShards(factory, fullSpeedWorkers);
+    }
+    if (agentA instanceof XcsAgent<?, ?> xcs) promotedSnapshotA = xcs.populationSnapshot();
+    if (agentB instanceof XcsAgent<?, ?> xcs) promotedSnapshotB = xcs.populationSnapshot();
     competitors = List.of(competitorView(agentA), competitorView(agentB));
     evaluationSeeds = rootSeeds.split();
     capturedTelemetry = captureTelemetry();
@@ -278,8 +306,10 @@ final class ArenaRun implements AutoCloseable {
         checkpoint();
         if (fullSpeedPool == null) playTrainingGame();
         else playFullSpeedBatch();
-        if ((agentA.learns() || agentB.learns())
+        if (!stopRequested
+            && (agentA.learns() || agentB.learns())
             && history.trainingGames() % request.evaluationIntervalValue() == 0) {
+          promoteShardsAtCheckpoint();
           playEvaluationSeries();
         }
       }
@@ -381,6 +411,9 @@ final class ArenaRun implements AutoCloseable {
   }
 
   private FullSpeedGame runFullSpeedGame(long gameNumber, long trainingNumber) {
+    if (fullSpeedPopulationPolicy == FullSpeedPopulationPolicy.SHARDED) {
+      return runShardedFullSpeedGame(gameNumber, trainingNumber);
+    }
     long gameSeed = mixSeed(request.parsedSeed() ^ trainingNumber);
     boolean aIsWhite = trainingNumber % 2 == 1;
     var whiteTemplate = aIsWhite ? agentA : agentB;
@@ -412,6 +445,93 @@ final class ArenaRun implements AutoCloseable {
               result.outcome().reason().name());
     }
     return new FullSpeedGame(result.outcome(), white.id(), result.turns().size(), replay);
+  }
+
+  private FullSpeedGame runShardedFullSpeedGame(long gameNumber, long trainingNumber) {
+    int workerSlot =
+        shardForTrainingGame(
+            trainingNumber, Objects.requireNonNull(fullSpeedPool).getCorePoolSize());
+    long gameSeed = mixSeed(request.parsedSeed() ^ trainingNumber);
+    boolean aIsWhite = trainingNumber % 2 == 1;
+    var whiteTemplate = aIsWhite ? agentA : agentB;
+    var blackTemplate = aIsWhite ? agentB : agentA;
+    var white =
+        shardedEpisodeAgent(whiteTemplate, aIsWhite ? "A" : "B", mixSeed(gameSeed), workerSlot);
+    var black =
+        shardedEpisodeAgent(blackTemplate, aIsWhite ? "B" : "A", mixSeed(gameSeed + 1), workerSlot);
+    var turns = gameNumber % 100 == 0 ? new ArrayList<ReplayTurn>() : null;
+    var result =
+        runner.run(
+            white,
+            black,
+            gameNumber,
+            true,
+            turn -> {
+              if (turns != null) turns.add(replayTurn(turn, white, black));
+            });
+    GameReplay replay = null;
+    if (turns != null) {
+      var winner = winnerIdentity(result.outcome(), white.id());
+      replay =
+          new GameReplay(
+              gameNumber,
+              false,
+              white.id(),
+              black.id(),
+              BoardView.from(result.initialState()),
+              turns,
+              winner == null ? "Draw" : winner + " win",
+              result.outcome().reason().name());
+    }
+    return new FullSpeedGame(result.outcome(), white.id(), result.turns().size(), replay);
+  }
+
+  private Agent<DraughtsState, DraughtsMove> shardedEpisodeAgent(
+      Agent<DraughtsState, DraughtsMove> template, String id, long seed, int workerSlot) {
+    if (template instanceof XcsAgent<?, ?>) {
+      var shards = id.equals("A") ? shardsA : shardsB;
+      if (!shards.isEmpty()) return shards.get(workerSlot);
+    }
+    return episodeAgent(template, id, seed);
+  }
+
+  private void initializeShards(DraughtsAgentFactory factory, int workerCount) {
+    shardsA.addAll(createShards(factory, agentA, request.agentA(), "A", workerCount));
+    shardsB.addAll(createShards(factory, agentB, request.agentB(), "B", workerCount));
+  }
+
+  @SuppressWarnings("unchecked")
+  private List<XcsAgent<DraughtsState, DraughtsMove>> createShards(
+      DraughtsAgentFactory factory,
+      Agent<DraughtsState, DraughtsMove> template,
+      AgentConfiguration configuration,
+      String id,
+      int workerCount) {
+    if (!(template instanceof XcsAgent<?, ?> generic)) return List.of();
+    var xcs = (XcsAgent<DraughtsState, DraughtsMove>) generic;
+    var snapshot = xcs.populationSnapshot();
+    var shards = new ArrayList<XcsAgent<DraughtsState, DraughtsMove>>(workerCount);
+    shards.add(xcs);
+    for (int slot = 1; slot < workerCount; slot++) {
+      long seed =
+          mixSeed(
+              request.parsedSeed()
+                  ^ (id.equals("A") ? 0xA0761D6478BD642FL : 0xE7037ED1A0B428DBL)
+                  ^ slot);
+      var copy =
+          (XcsAgent<DraughtsState, DraughtsMove>)
+              factory.create(id, configuration, seed, xcs.parameters(), snapshot);
+      copy.sampledDeletion(true);
+      shards.add(copy);
+    }
+    return List.copyOf(shards);
+  }
+
+  static int shardForTrainingGame(long trainingNumber, int workerCount) {
+    if (trainingNumber <= 0 || workerCount < 1) {
+      throw new IllegalArgumentException("Training game and worker count must be positive");
+    }
+    return (int) ((trainingNumber - 1) % workerCount);
   }
 
   @SuppressWarnings("unchecked")
@@ -493,8 +613,121 @@ final class ArenaRun implements AutoCloseable {
     if (!(agent instanceof lmarek.lcs.xcs.XcsAgent<?, ?> xcs)) {
       throw new IllegalStateException("Named rule sets require an XCS agent");
     }
-    Objects.requireNonNull(ruleSets)
-        .save(configuration.ruleSet(), xcs.parameters(), xcs.populationSnapshot());
+    var snapshot = xcs.populationSnapshot();
+    if (fullSpeedPopulationPolicy == FullSpeedPopulationPolicy.SHARDED) {
+      var promoted = xcs.id().equals("A") ? promotedSnapshotA : promotedSnapshotB;
+      if (promoted != null) snapshot = promoted;
+    }
+    Objects.requireNonNull(ruleSets).save(configuration.ruleSet(), xcs.parameters(), snapshot);
+  }
+
+  void promoteShardsAtCheckpoint() {
+    long validationSeed =
+        mixSeed(request.parsedSeed() ^ history.trainingGames() ^ 0x8EBC6AF09C88C6E3L);
+    var currentA = agentA;
+    var currentB = agentB;
+    var scoresA = scoreShards(shardsA, currentB, "A", validationSeed);
+    var scoresB = scoreShards(shardsB, currentA, "B", validationSeed);
+    if (!shardsA.isEmpty()) {
+      int champion = promoteShards(shardsA, scoresA);
+      agentA = shardsA.get(champion);
+      promotedSnapshotA = shardsA.get(champion).populationSnapshot();
+      evolutionSequences.put("A", promotedSnapshotA.nextEventSequence() - 1);
+    }
+    if (!shardsB.isEmpty()) {
+      int champion = promoteShards(shardsB, scoresB);
+      agentB = shardsB.get(champion);
+      promotedSnapshotB = shardsB.get(champion).populationSnapshot();
+      evolutionSequences.put("B", promotedSnapshotB.nextEventSequence() - 1);
+    }
+  }
+
+  private double[] scoreShards(
+      List<XcsAgent<DraughtsState, DraughtsMove>> shards,
+      Agent<DraughtsState, DraughtsMove> opponent,
+      String candidateId,
+      long validationSeed) {
+    if (shards.isEmpty()) return new double[0];
+    var pool = Objects.requireNonNull(fullSpeedPool);
+    var futures = new ArrayList<Future<Double>>(shards.size());
+    for (var shard : shards) {
+      futures.add(pool.submit(() -> scoreShard(shard, opponent, candidateId, validationSeed)));
+    }
+    var scores = new double[shards.size()];
+    try {
+      for (int index = 0; index < futures.size(); index++) {
+        checkpoint();
+        scores[index] = futures.get(index).get();
+      }
+    } catch (InterruptedException exception) {
+      futures.forEach(future -> future.cancel(true));
+      Thread.currentThread().interrupt();
+      throw new CancellationException("Shard validation interrupted");
+    } catch (java.util.concurrent.ExecutionException exception) {
+      futures.forEach(future -> future.cancel(true));
+      var cause = exception.getCause();
+      if (cause instanceof RuntimeException runtime) throw runtime;
+      throw new IllegalStateException("Shard validation failed", cause);
+    }
+    return scores;
+  }
+
+  private double scoreShard(
+      XcsAgent<DraughtsState, DraughtsMove> candidate,
+      Agent<DraughtsState, DraughtsMove> opponent,
+      String candidateId,
+      long validationSeed) {
+    var candidateView = candidate.frozenCopy(mixSeed(validationSeed ^ 0x589965CC75374CC3L));
+    var opponentView = validationAgent(opponent, mixSeed(validationSeed ^ 0x1D8E4E27C47D124FL));
+    int validationGames = request.evaluationGamesValue();
+    if (validationGames % 2 != 0) validationGames++;
+    double score = 0.0;
+    for (int gameIndex = 0; gameIndex < validationGames; gameIndex++) {
+      checkpoint();
+      boolean candidateIsWhite = gameIndex % 2 == 0;
+      var white = candidateIsWhite ? candidateView : opponentView;
+      var black = candidateIsWhite ? opponentView : candidateView;
+      var outcome = runner.run(white, black, gameIndex + 1L, false, ignored -> {}).outcome();
+      var winner = winnerIdentity(outcome, white.id());
+      if (winner == null) score += 0.5;
+      else if (winner.equals(candidateId)) score += 1.0;
+    }
+    return score / validationGames;
+  }
+
+  private Agent<DraughtsState, DraughtsMove> validationAgent(
+      Agent<DraughtsState, DraughtsMove> template, long seed) {
+    if (template instanceof XcsAgent<?, ?> xcs) {
+      @SuppressWarnings("unchecked")
+      var draughtsXcs = (XcsAgent<DraughtsState, DraughtsMove>) xcs;
+      return draughtsXcs.frozenCopy(seed);
+    }
+    var configuration = template.id().equals("A") ? request.agentA() : request.agentB();
+    return new DraughtsAgentFactory(game, matchingExecutor)
+        .create(template.id(), configuration, seed);
+  }
+
+  static <S, M> int promoteShards(List<XcsAgent<S, M>> shards, double[] scores) {
+    if (shards.isEmpty() || shards.size() != scores.length) {
+      throw new IllegalArgumentException("Each shard must have one promotion score");
+    }
+    int champion = championIndex(scores);
+    var snapshot = shards.get(champion).populationSnapshot();
+    for (var shard : shards) shard.restorePopulation(snapshot);
+    return champion;
+  }
+
+  static int championIndex(double[] scores) {
+    if (scores.length == 0) throw new IllegalArgumentException("At least one shard is required");
+    int champion = 0;
+    if (!Double.isFinite(scores[0])) throw new IllegalArgumentException("Scores must be finite");
+    for (int index = 1; index < scores.length; index++) {
+      if (!Double.isFinite(scores[index])) {
+        throw new IllegalArgumentException("Scores must be finite");
+      }
+      if (scores[index] > scores[champion]) champion = index;
+    }
+    return champion;
   }
 
   private void playEvaluationSeries() {
@@ -872,6 +1105,10 @@ final class ArenaRun implements AutoCloseable {
         }
       }
       matchingExecutor.close();
+      if (fullSpeedPool != null) {
+        fullSpeedPool.shutdownNow();
+        awaitFullSpeedWorkers(fullSpeedPool);
+      }
     } finally {
       if (interrupted) Thread.currentThread().interrupt();
     }

@@ -113,6 +113,9 @@ tasks.register<JavaExec>("benchmarks") {
     classpath = benchmark.runtimeClasspath
     mainClass = "org.openjdk.jmh.Main"
     args = providers.gradleProperty("benchmarkArgs").orElse("-f 3 -wi 5 -i 5 -w 1s -r 1s -prof gc -rf json -rff build/jmh-results.json").get().split(" ")
+    providers.gradleProperty("shardingFixtureDirectory").orNull?.let {
+        systemProperty("lcs.sharding.fixtureDirectory", it)
+    }
     maxHeapSize = "32g"
 }
 tasks.register<JavaExec>("concurrencyStress") {
@@ -130,6 +133,19 @@ tasks.register<JavaExec>("largePopulationSoak") {
     maxHeapSize = "32g"
     jvmArgs("-XX:StartFlightRecording=filename=build/soak.jfr,settings=profile,dumponexit=true,maxsize=512m")
     args(providers.gradleProperty("soakSeconds").orElse("3600").get())
+}
+tasks.register<JavaExec>("shardingQuality") {
+    group = "verification"
+    description = "Train and compare shared and sharded XCS on paired held-out games."
+    classpath = benchmark.runtimeClasspath
+    mainClass = "lmarek.lcs.arena.ShardingQualityExperiment"
+    maxHeapSize = "32g"
+    args(
+        providers.gradleProperty("shardingTrainingGames").orElse("1000").get(),
+        providers.gradleProperty("shardingHeldOutGames").orElse("1000").get(),
+        providers.gradleProperty("shardingWorkers").orElse("4").get(),
+        providers.gradleProperty("shardingFixtureDirectory").orElse("build/sharding-quality-fixtures").get(),
+    )
 }
 tasks.register<org.springframework.boot.gradle.tasks.run.BootRun>("performanceRun") {
     group = "application"

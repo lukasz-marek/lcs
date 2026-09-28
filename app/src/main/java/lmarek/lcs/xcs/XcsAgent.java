@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.SplittableRandom;
+import java.util.function.LongConsumer;
 import java.util.random.RandomGenerator;
 import lmarek.lcs.agent.Agent;
 import lmarek.lcs.agent.AgentDecision;
@@ -31,6 +32,7 @@ public final class XcsAgent<S, M> implements Agent<S, M>, XcsInspectable {
   private final RandomGenerator random;
   private final XcsPopulation population;
   private final boolean frozen;
+  private @Nullable LongConsumer decisionDurationObserver;
   private Optional<Player> seat = Optional.empty();
   private Optional<PendingDecision> pending = Optional.empty();
   private boolean trainingEpisode;
@@ -72,6 +74,16 @@ public final class XcsAgent<S, M> implements Agent<S, M>, XcsInspectable {
   public synchronized XcsPopulationSnapshot populationSnapshot() {
     synchronized (population) {
       return population.snapshotForPersistence();
+    }
+  }
+
+  /** Replaces this learner's state at a quiescent episode boundary. */
+  public synchronized void restorePopulation(XcsPopulationSnapshot snapshot) {
+    synchronized (population) {
+      if (population.protectedReferenceCount() != 0) {
+        throw new IllegalStateException("Cannot replace a population during an active episode");
+      }
+      population.restoreFrom(snapshot);
     }
   }
 
@@ -119,8 +131,22 @@ public final class XcsAgent<S, M> implements Agent<S, M>, XcsInspectable {
 
   /** Creates an episode-local learner that contributes updates to this agent's population. */
   public synchronized XcsAgent<S, M> sharedEpisode(long seed) {
-    return new XcsAgent<>(
-        id, displayName, encoder, parameters, new SplittableRandom(seed), population, false, true);
+    var episode =
+        new XcsAgent<S, M>(
+            id,
+            displayName,
+            encoder,
+            parameters,
+            new SplittableRandom(seed),
+            population,
+            false,
+            true);
+    episode.decisionDurationObserver = decisionDurationObserver;
+    return episode;
+  }
+
+  synchronized void decisionDurationObserver(@Nullable LongConsumer observer) {
+    decisionDurationObserver = observer;
   }
 
   private XcsAgent(
@@ -173,6 +199,17 @@ public final class XcsAgent<S, M> implements Agent<S, M>, XcsInspectable {
   @Override
   @SuppressWarnings("StringConcatToTextBlock")
   public synchronized AgentDecision<M> decide(DecisionContext<S, M> context) {
+    var observer = decisionDurationObserver;
+    if (observer == null) return decideInPopulation(context);
+    long started = System.nanoTime();
+    try {
+      return decideInPopulation(context);
+    } finally {
+      observer.accept(System.nanoTime() - started);
+    }
+  }
+
+  private AgentDecision<M> decideInPopulation(DecisionContext<S, M> context) {
     synchronized (population) {
       var perspective =
           seat.orElseThrow(() -> new IllegalStateException("beginEpisode must precede decide"));

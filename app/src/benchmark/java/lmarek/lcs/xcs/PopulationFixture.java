@@ -46,7 +46,7 @@ public final class PopulationFixture {
                     false,
                     actionIds,
                     attributes)
-                : create(false, size, 1000, 1, false, false));
+                : create(false, size, maximumPopulation, 1000, 1, false, false, List.of(), 52));
     seeded.matchingExecutor((MatchingExecutor) executor.get(original));
     field.set(agent, seeded);
   }
