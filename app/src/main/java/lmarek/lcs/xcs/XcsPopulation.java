@@ -675,6 +675,9 @@ final class XcsPopulation {
 
   private void reserveCoveringSpace(int amount, Set<Long> protectedRuleIds) {
     var needed = Math.max(0, microPopulationSize() + amount - parameters.maximumPopulation());
+    if (needed == 0) {
+      return;
+    }
     var deletable =
         rules.stream()
             .mapToInt(
