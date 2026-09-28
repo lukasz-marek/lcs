@@ -260,6 +260,31 @@ workers; those intervals overlap, so the end-to-end result is inconclusive.
 The focused encoder gain and absence of an end-to-end regression justify keeping
 this behavior-preserving change without claiming a full-game speedup.
 
+### Ten-trial screening (2026-09-28)
+
+Each candidate below was benchmarked and either discarded or committed. Full-game
+numbers are JMH batch throughput; multiply by games per batch to compare game
+throughput. The full-speed fixture uses a synthetic 100k-rule population against
+RANDOM. Short full-game confidence intervals overlap often, so only focused
+kernel wins with no end-to-end regression were retained.
+
+| # | Candidate | Measurement | Decision |
+|---:|---|---|---|
+| 1 | Skip decision-trace copies when a replay is not recorded | At four workers, 1.112 ± 0.206 to 1.398 ± 0.237 batches/s (4 games/batch); intervals overlap and allocation per game was unchanged. | Discarded |
+| 2 | Compact parallel match results into a boolean mask | At 1m rules, allocation fell 25% (217.9 to 163.3 MB/match), but throughput stayed 0.004 ± 0.001 ops/ms. Full-speed throughput fell from 1.112 ± 0.206 to 1.011 ± 0.165 batches/s. | Discarded |
+| 3 | Give matching up to 15 workers independently of game workers | Four-worker full-speed throughput was 0.989 ± 0.151 batches/s (4 games/batch), below the 1.112 ± 0.206 baseline; intervals overlap. | Discarded |
+| 4 | Lower the full-speed matching threshold | At four workers: 1.357 ± 0.214, 1.331 ± 0.304 and 1.329 ± 0.299 batches/s for thresholds 2,048, 8,192 and 32,768. | Discarded |
+| 5 | Avoid copying protected rule IDs twice per decision | Paired control and change measured 1.356 ± 0.269 and 1.418 ± 0.229 batches/s; intervals overlap. | Discarded |
+| 6 | Avoid allocating an empty endgame-clock list for ordinary moves | `analyzedMove` rose 0.7% (1,902 to 1,916 thousand ops/ms) and allocation fell 32 B/op; throughput intervals overlap. | Discarded |
+| 7 | Read encoder bitboards once and scan endgame clocks once | Encoder throughput rose 5% and allocation fell 11%; full-speed results did not regress. | **Committed** |
+| 8 | Cache the first four reversible plies per worker | Full-speed throughput was 1.401 ± 0.266 batches/s without the cache and 1.399 ± 0.301 with it; allocation was unchanged. | Discarded |
+| 9 | Replace `Optional` wrappers while walking repetition history | A 130-position history measured 31.784 ± 0.232 versus 31.814 ± 0.235 thousand encodes/ms; allocation fell 1.4%. | Discarded |
+| 10 | Keep a second wave of games queued to cover stragglers | At four workers, 0.690 ± 0.159 batches/s × 8 games = 5.52 games/s, versus 1.401 ± 0.266 × 4 = 5.60 games/s. | Discarded |
+
+The retained encoder change does not alter XCS observations or learning. All
+trace suppression, worker-count, and scheduling variants were reverted; full
+decision traces and the original full-speed batch scheduling remain in effect.
+
 ## Verification
 
 The tests compare exact decisions, traces, rule snapshots, history entries and
