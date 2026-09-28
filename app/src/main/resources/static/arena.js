@@ -19,6 +19,29 @@ const ACTIVE_STATUSES = new Set(["RUNNING", "PAUSING", "PAUSED", "STOPPING"]);
 const CONTROLLABLE_STATUSES = new Set(["RUNNING", "PAUSING", "PAUSED"]);
 const LONG_MIN = -9223372036854775808n;
 const LONG_MAX = 9223372036854775807n;
+const SETTING_HELP = {
+  maximumPopulation: "Maximum number of micro-classifiers this XCS population can retain. A micro-classifier is one copy of a rule; duplicate rules increase numerosity.",
+  beta: "Learning rate for updating a rule's prediction, prediction error, and action-set size. Larger values adapt faster but make estimates more sensitive to recent outcomes.",
+  gamma: "Discount applied to future rewards when XCS updates predictions. Lower values favor immediate rewards; values near 1 give more weight to long-term outcomes.",
+  explorationProbability: "Chance that XCS chooses a random legal move instead of its current best predicted move, so it can keep exploring alternatives.",
+  wildcardProbability: "Chance that each condition attribute created by covering is left unrestricted. Higher values create broader rules that match more board states.",
+  simulations: "Number of simulated continuations UCT search evaluates for each move. More simulations usually improve search quality and take longer.",
+  rolloutPlyLimit: "Maximum number of plies in one simulated continuation. At the cap, search estimates the position without simulating further.",
+  evaluationInterval: "When either competitor learns, run a frozen evaluation series after every configured number of completed training games. Evaluation games do not update the learners or training score.",
+  evaluationGames: "Number of frozen games in each evaluation series. An even count gives both competitors the same number of games as White and Black.",
+};
+const METHOD_HELP = {
+  XCS: "Learns condition-action rules from rewards and uses their predictions to choose moves.",
+  MCTS: "Uses UCT Monte Carlo tree search to compare simulated continuations before choosing a move.",
+  RANDOM: "Chooses uniformly from the currently legal moves; this is a non-learning baseline.",
+};
+const PRESET_HELP = {
+  FAST: "Uses 100 simulations per move for quicker, lighter search.",
+  BALANCED: "Uses 500 simulations per move as a balance between search quality and speed.",
+  STRONG: "Uses 2,000 simulations per move for deeper search at higher compute cost.",
+  STANDARD: "Standard XCS learning configuration. Adjust the advanced values to change its learning behavior.",
+  UNIFORM: "Uniform random choice among legal moves.",
+};
 
 const state = {
   options: null,
@@ -127,6 +150,16 @@ function setText(id, text) {
   document.querySelector(`#${id}`).textContent = text;
 }
 
+function helpMarker(message) {
+  const marker = document.createElement("span");
+  marker.className = "field-help";
+  marker.tabIndex = 0;
+  marker.setAttribute("role", "note");
+  marker.setAttribute("aria-label", `Help: ${message}`);
+  marker.dataset.tooltip = message;
+  return marker;
+}
+
 function applySetting(input, setting, value = setting.defaultValue) {
   input.value = String(value);
   input.step = String(setting.step);
@@ -136,6 +169,10 @@ function applySetting(input, setting, value = setting.defaultValue) {
   else input.removeAttribute("max");
   input.dataset.integral = String(Boolean(setting.integral));
   input.dataset.even = String(Boolean(setting.even));
+  const description =
+    SETTING_HELP[setting.id] ||
+    `${setting.label}. Allowed range: ${setting.minimum} to ${setting.maximum}.`;
+  input.title = description;
 }
 
 function readSetting(input, setting) {
@@ -173,7 +210,10 @@ function setupAgent(side) {
     advanced.replaceChildren(
       ...current.settings.map((setting) => {
         const label = document.createElement("label");
-        label.textContent = setting.label;
+        label.append(
+          document.createTextNode(setting.label),
+          helpMarker(SETTING_HELP[setting.id] || `${setting.label}.`),
+        );
         const input = document.createElement("input");
         input.name = setting.id;
         input.type = "number";
@@ -187,14 +227,23 @@ function setupAgent(side) {
   const refresh = () => {
     const current = state.options.agentKinds.find((item) => item.id === kind.value);
     if (!current) return;
+    kind.title = METHOD_HELP[current.id] || current.label;
     preset.replaceChildren(...current.presets.map((item) => option(item.id, item.label)));
     preset.value = current.defaultPreset;
+    preset.title =
+      PRESET_HELP[preset.value] ||
+      `Preset: ${preset.selectedOptions[0]?.textContent || preset.value}.`;
     renderAdvanced(current);
   };
 
   preset.addEventListener("change", () => {
     const current = state.options.agentKinds.find((item) => item.id === kind.value);
-    if (current) renderAdvanced(current);
+    if (current) {
+      preset.title =
+        PRESET_HELP[preset.value] ||
+        `Preset: ${preset.selectedOptions[0]?.textContent || preset.value}.`;
+      renderAdvanced(current);
+    }
   });
   kind.addEventListener("change", refresh);
   refresh();
@@ -232,6 +281,10 @@ function setupPacing() {
       button.className = "pace";
       button.dataset.pacing = mode;
       button.type = "button";
+      button.title =
+        mode === "LIVE"
+          ? "Pause briefly between training moves so the game is easier to watch."
+          : "Run training games without a delay between moves.";
       button.append(document.createTextNode(label));
       if (detail) {
         const small = document.createElement("small");

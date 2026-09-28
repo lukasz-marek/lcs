@@ -40,8 +40,8 @@
         <div class="matchup-grid">
           <fieldset class="competitor competitor-a">
             <legend><span>A</span> Challenger</legend>
-            <label>Method<select id="agent-a-kind"></select></label>
-            <label>Preset<select id="agent-a-preset"></select></label>
+            <label>Method<span class="field-help" tabindex="0" role="note" data-tooltip="Choose how this competitor selects moves. XCS learns rules, UCT search compares simulated continuations, and Random picks uniformly from legal moves." aria-label="Help: Choose how this competitor selects moves. XCS learns rules, UCT search compares simulated continuations, and Random picks uniformly from legal moves."></span><select id="agent-a-kind"></select></label>
+            <label>Preset<span class="field-help" tabindex="0" role="note" data-tooltip="Choose a bundled starting configuration. Advanced settings show its values and can be changed before starting." aria-label="Help: Choose a bundled starting configuration. Advanced settings show its values and can be changed before starting."></span><select id="agent-a-preset"></select></label>
             <details>
               <summary>Advanced settings</summary>
               <div id="agent-a-advanced" class="advanced-grid"></div>
@@ -52,8 +52,8 @@
 
           <fieldset class="competitor competitor-b">
             <legend><span>B</span> Defender</legend>
-            <label>Method<select id="agent-b-kind"></select></label>
-            <label>Preset<select id="agent-b-preset"></select></label>
+            <label>Method<span class="field-help" tabindex="0" role="note" data-tooltip="Choose how this competitor selects moves. XCS learns rules, UCT search compares simulated continuations, and Random picks uniformly from legal moves." aria-label="Help: Choose how this competitor selects moves. XCS learns rules, UCT search compares simulated continuations, and Random picks uniformly from legal moves."></span><select id="agent-b-kind"></select></label>
+            <label>Preset<span class="field-help" tabindex="0" role="note" data-tooltip="Choose a bundled starting configuration. Advanced settings show its values and can be changed before starting." aria-label="Help: Choose a bundled starting configuration. Advanced settings show its values and can be changed before starting."></span><select id="agent-b-preset"></select></label>
             <details>
               <summary>Advanced settings</summary>
               <div id="agent-b-advanced" class="advanced-grid"></div>
@@ -63,21 +63,22 @@
 
         <div class="run-options">
           <label
-            >Seed<input
+            >Seed<span class="field-help" tabindex="0" role="note" data-tooltip="Initializes the run's random choices. Reusing the same seed with the same settings makes runs reproducible." aria-label="Help: Initializes the run's random choices. Reusing the same seed with the same settings makes runs reproducible."></span><input
               id="seed"
               type="text"
               value="20250920"
+              title="Initializes the run's random choices. Reusing the same seed with the same settings makes runs reproducible."
               inputmode="numeric"
               pattern="-?[0-9]+"
               spellcheck="false"
             />
           </label>
           <label>
-            Evaluation interval
+            Evaluation interval<span class="field-help" tabindex="0" role="note" data-tooltip="When either competitor learns, run a frozen evaluation series after every configured number of completed training games. Evaluation games do not update the learners or training score." aria-label="Help: When either competitor learns, run a frozen evaluation series after every configured number of completed training games. Evaluation games do not update the learners or training score."></span>
             <input id="evaluation-interval" type="number" value="500" min="1" step="1" />
           </label>
           <label>
-            Evaluation games
+            Evaluation games<span class="field-help" tabindex="0" role="note" data-tooltip="Number of frozen games in each evaluation series. The even count gives both competitors the same number of games as White and Black." aria-label="Help: Number of frozen games in each evaluation series. The even count gives both competitors the same number of games as White and Black."></span>
             <input id="evaluation-games" type="number" value="20" min="2" step="2" />
           </label>
           <div id="pacing-choice" class="pacing-choice" role="group" aria-label="Pacing"></div>
@@ -137,8 +138,8 @@
               <button class="chart-tab" data-chart="learning" type="button">XCS learning</button>
               <button class="chart-tab" data-chart="evaluation" type="button">Evaluation</button>
             </div>
-            <label id="learning-metric-label" hidden>Learning metric
-              <select id="learning-metric">
+            <label id="learning-metric-label" hidden>Learning metric<span class="field-help" tabindex="0" role="note" data-tooltip="Choose which XCS measure to plot for each competitor over completed training games." aria-label="Help: Choose which XCS measure to plot for each competitor over completed training games."></span>
+              <select id="learning-metric" title="Choose which XCS measure to plot for each competitor over completed training games.">
                 <option value="population">Population (micro-classifiers)</option>
                 <option value="generality">Generality (wildcard fraction)</option>
                 <option value="error">Prediction error</option>
@@ -176,11 +177,11 @@
             <div><p class="kicker">RULE INSPECTOR</p><h2>Classifier anatomy</h2></div>
             <div class="rule-search">
               <label
-                >Competitor
-                <select id="rule-competitor" aria-label="Rule competitor"></select>
+                >Competitor<span class="field-help" tabindex="0" role="note" data-tooltip="Choose which competitor's retained XCS population to inspect." aria-label="Help: Choose which competitor's retained XCS population to inspect."></span>
+                <select id="rule-competitor" aria-label="Rule competitor" title="Choose which competitor's retained XCS population to inspect."></select>
               </label>
               <label
-                >Rule ID<input id="rule-id" placeholder="e.g. 42" inputmode="numeric" />
+                >Rule ID<span class="field-help" tabindex="0" role="note" data-tooltip="Enter a retained classifier's identifier to inspect its condition, action, metrics, and recent changes." aria-label="Help: Enter a retained classifier's identifier to inspect its condition, action, metrics, and recent changes."></span><input id="rule-id" placeholder="e.g. 42" inputmode="numeric" title="Enter a retained classifier's identifier to inspect its condition, action, metrics, and recent changes." />
               </label>
             </div>
           </div>
@@ -195,14 +196,14 @@
         <article class="card replay-card">
           <div class="section-heading compact">
             <div><p class="kicker">REPLAY VAULT</p><h2>Last 20 games</h2></div>
-            <select id="replay-picker" aria-label="Choose the live board or a replay">
+            <select id="replay-picker" aria-label="Choose the live board or a replay" title="Choose the live game or one of the most recently retained training and evaluation replays.">
               <option value="LIVE">Live board</option>
             </select>
           </div>
           <div class="replay-controls">
             <button id="replay-start" class="secondary" type="button">|◀</button>
             <button id="replay-prev" class="secondary" type="button">◀</button>
-            <input id="replay-slider" type="range" min="0" max="0" value="0" aria-label="Replay move" />
+            <input id="replay-slider" type="range" min="0" max="0" value="0" aria-label="Replay move" title="Move through the selected game's plies. The first position is the starting board." />
             <button id="replay-next" class="secondary" type="button">▶</button>
             <button id="replay-play" class="secondary" type="button">Play</button>
           </div>

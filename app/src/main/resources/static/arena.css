@@ -44,9 +44,15 @@ main { max-width: 1480px; margin: 0 auto; padding: 24px 34px 60px; }
 .competitor legend { font: 700 1rem Georgia, serif; padding: 0 8px; }
 .competitor legend span { display: inline-grid; place-items: center; width: 23px; height: 23px; margin-right: 7px; color: #101315; background: var(--cyan); font: 800 .75rem sans-serif; }
 .competitor-b legend span { background: var(--coral); }
-label { display: grid; gap: 6px; color: #bbb; font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; }
+label { display: block; color: #bbb; font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; }
+label > select, label > input { display: block; margin-top: 6px; }
 select, input { width: 100%; border: 1px solid #454b4e; background: #111416; color: var(--ink); padding: 10px; font: 500 .85rem sans-serif; outline: none; }
 select:focus, input:focus { border-color: var(--cyan); box-shadow: 0 0 0 2px #47d7d022; }
+.field-help { position: relative; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 6px; border: 1px solid #687477; border-radius: 50%; color: var(--cyan); font: 700 10px/1 sans-serif; letter-spacing: 0; text-transform: none; vertical-align: 1px; cursor: help; }
+.field-help::before { content: "?"; }
+.field-help::after { content: attr(data-tooltip); position: absolute; z-index: 20; left: -8px; bottom: calc(100% + 8px); width: max-content; max-width: min(290px, 78vw); padding: 9px 11px; border: 1px solid #485457; background: #0c1011; color: var(--ink); box-shadow: 0 8px 24px #000b; font: 500 .72rem/1.45 sans-serif; letter-spacing: 0; text-transform: none; white-space: normal; opacity: 0; visibility: hidden; pointer-events: none; }
+.field-help:hover::after, .field-help:focus-visible::after { opacity: 1; visibility: visible; }
+.field-help:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 details { grid-column: 1/-1; border-top: 1px solid var(--line); padding-top: 10px; }
 summary { cursor: pointer; color: var(--muted); font-size: .72rem; }
 .advanced-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; }
