@@ -208,6 +208,23 @@ Raw results are `app/build/xcs-cover-capacity-baseline.json` and
 `app/build/xcs-cover-early-return.json`, and
 `app/build/xcs-cover-early-profile.json`.
 
+Two later matching experiments were rolled back because their confidence
+intervals overlapped the controls. A one-pass per-action accumulator changed
+100k full-speed throughput from 5.147 ± 0.344 to 5.552 ± 0.388 batches/s at
+one game worker, 1.155 ± 0.134 to 1.158 ± 0.147 at four, and 0.443 ± 0.044 to
+0.459 ± 0.055 at eight. The repeated comparison did not establish a reliable
+gain. A cached single-specific-attribute index measured 0.167 ± 0.011 or
+0.199 ± 0.021 matches/ms, depending on representation, against 0.182 ± 0.011
+for the existing matcher on a one-million-rule, one-specific-attribute kernel.
+Neither representation showed a clear gain, and the index array adds per-rule
+memory, so both were discarded. These results reinforce that kernel changes
+need an end-to-end improvement before they stay. Their raw results are in
+`app/build/xcs-match-accumulator.json`,
+`app/build/xcs-match-accumulator-baseline-repeat.json`,
+`app/build/xcs-sparse-index-baseline.json`,
+`app/build/xcs-sparse-index-fastpath.json`, and
+`app/build/xcs-single-index-fastpath.json`.
+
 ```sh
 ./gradlew benchmarks -PbenchmarkArgs='PopulationBenchmark.update -p size=10000,100000,1000000 -p implementation=parallel -p workers=1,2,4,8,15 -p actions=1 -p numerosity=1 -p highMatch=true -p histories=false -f 3 -wi 5 -i 5 -w 1s -r 1s -bm thrpt,sample -prof gc -rf json -rff build/learning-update.json'
 ./gradlew benchmarks -PbenchmarkArgs='PopulationBenchmark.matching -p size=10000,100000,1000000 -p implementation=parallel -p workers=1,2,4,8,15 -p actions=1 -p numerosity=1 -p highMatch=true -p histories=false -f 3 -wi 5 -i 5 -w 1s -r 1s -bm thrpt,sample -prof gc -rf json -rff build/learning-matching.json'
