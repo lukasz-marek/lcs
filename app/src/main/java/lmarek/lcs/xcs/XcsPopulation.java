@@ -665,12 +665,20 @@ final class XcsPopulation {
     if (microPopulationSize() < parameters.maximumPopulation()) {
       return true;
     }
-    var deletable = rules.stream().anyMatch(rule -> isDeletable(rule, protectedRuleIds));
-    if (!deletable) {
+    if (!hasDeletableRule(protectedRuleIds)) {
       return false;
     }
     deleteOne(protectedRuleIds);
     return true;
+  }
+
+  private boolean hasDeletableRule(Set<Long> protectedRuleIds) {
+    if (sampledDeletion
+        && indexedRules.size() > 64
+        && (microCount > indexedRules.size() || indexedRules.size() > protectedRuleIds.size())) {
+      return true;
+    }
+    return rules.stream().anyMatch(rule -> isDeletable(rule, protectedRuleIds));
   }
 
   private void reserveCoveringSpace(int amount, Set<Long> protectedRuleIds) {
@@ -678,20 +686,37 @@ final class XcsPopulation {
     if (needed == 0) {
       return;
     }
-    var deletable =
-        rules.stream()
-            .mapToInt(
-                rule ->
-                    protectedRuleIds.contains(rule.id)
-                        ? Math.max(0, rule.numerosity - 1)
-                        : rule.numerosity)
-            .sum();
-    if (needed > deletable) {
+    if (!hasEnoughDeletableMicroClassifiers(needed, protectedRuleIds)) {
       throw capacityException(amount, protectedRuleIds);
     }
     for (var count = 0; count < needed; count++) {
       deleteOne(protectedRuleIds);
     }
+  }
+
+  private boolean hasEnoughDeletableMicroClassifiers(int needed, Set<Long> protectedRuleIds) {
+    if (!sampledDeletion || indexedRules.size() <= 64) {
+      var deletable =
+          rules.stream()
+              .mapToInt(
+                  rule ->
+                      protectedRuleIds.contains(rule.id)
+                          ? Math.max(0, rule.numerosity - 1)
+                          : rule.numerosity)
+              .sum();
+      return needed <= deletable;
+    }
+    var conservativeDeletable = microCount - protectedRuleIds.size();
+    if (needed <= conservativeDeletable) {
+      return true;
+    }
+    var protectedRules = 0;
+    for (var ruleId : protectedRuleIds) {
+      if (byId.containsKey(ruleId)) {
+        protectedRules++;
+      }
+    }
+    return needed <= microCount - protectedRules;
   }
 
   private XcsCapacityException capacityException(int missingActions, Set<Long> protectedRuleIds) {

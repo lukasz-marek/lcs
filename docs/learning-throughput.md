@@ -183,7 +183,23 @@ deletion is needed. In the one-worker profile, the previously sampled
 `reserveCoveringSpace` stream scan no longer appears. The complete-game result
 did not show a clear improvement at four or eight workers, so this remains a
 profile-backed removal of unnecessary work rather than a claimed throughput
-gain. Benchmark JSON files are
+gain. A follow-up removes the capacity preflight scan in the sampled-deletion
+path too. It uses the maintained micro-population count and a conservative
+bound from protected IDs; if that bound is inconclusive, it checks only those
+IDs against the population index. Capacity tests verify all-protected singleton
+rules and that an insufficient request cannot partially delete protected rules
+with excess numerosity.
+
+The focused `sampledCoveringAtCapacity` JMH case measures this path with a
+100k-rule population at capacity, one new legal action, and sampled deletion
+enabled. Three forks with five one-second warmup and measurement iterations
+measured 1.658 ± 0.052 ops/ms and 2.42 MB/op before, versus 105.523 ± 7.359
+ops/ms and 17.8 KB/op after. This is a 63.6× capacity-path gain with 99.3%
+less allocation. The benchmark forces deletion pressure and isolates capacity
+checking; it does not imply the same gain in complete games. The 50% complete-
+game target still needs confirmation on representative trained populations.
+Raw results are `app/build/xcs-cover-capacity-baseline.json` and
+`app/build/xcs-cover-capacity-fastpath.json`. Benchmark JSON files are
 `app/build/xcs-experiment-baseline.json`,
 `app/build/xcs-parallel-matching.json`, and
 `app/build/xcs-fast-general-rules.json`,
@@ -196,6 +212,7 @@ gain. Benchmark JSON files are
 ./gradlew benchmarks -PbenchmarkArgs='PopulationBenchmark.update -p size=10000,100000,1000000 -p implementation=parallel -p workers=1,2,4,8,15 -p actions=1 -p numerosity=1 -p highMatch=true -p histories=false -f 3 -wi 5 -i 5 -w 1s -r 1s -bm thrpt,sample -prof gc -rf json -rff build/learning-update.json'
 ./gradlew benchmarks -PbenchmarkArgs='PopulationBenchmark.matching -p size=10000,100000,1000000 -p implementation=parallel -p workers=1,2,4,8,15 -p actions=1 -p numerosity=1 -p highMatch=true -p histories=false -f 3 -wi 5 -i 5 -w 1s -r 1s -bm thrpt,sample -prof gc -rf json -rff build/learning-matching.json'
 ./gradlew benchmarks -PbenchmarkArgs='TrainingBenchmark -p dense=false,true -p size=10000,100000,1000000 -p workers=1,2,4,8,15 -f 3 -wi 5 -i 5 -w 1s -r 1s -bm thrpt,sample -prof gc -rf json -rff build/learning-training.json'
+./gradlew benchmarks -PbenchmarkArgs='PopulationBenchmark.sampledCoveringAtCapacity -p size=100000 -p implementation=sequential -p actions=1000 -p numerosity=1 -p highMatch=true -p histories=false -p workers=1 -f 3 -wi 5 -i 5 -w 1s -r 1s -bm thrpt -prof gc -rf json -rff build/xcs-cover-capacity.json'
 ```
 
 For CPU attribution and decision latency, add

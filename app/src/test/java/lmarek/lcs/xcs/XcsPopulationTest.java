@@ -1,6 +1,7 @@
 package lmarek.lcs.xcs;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import java.util.Random;
@@ -131,6 +132,49 @@ class XcsPopulationTest {
     assertThat(population.eventsAfter(0, 100))
         .filteredOn(event -> event.type() == XcsEvolutionEvent.Type.CAPACITY_REJECTED)
         .hasSize(2);
+  }
+
+  @Test
+  void sampledCoveringRejectsWhenEverySingletonRuleIsProtected() {
+    var population = new XcsPopulation(parameters(70, 0, 0.0, 0.0, 0.0, 0.01), new Random(10));
+    var actions = java.util.stream.IntStream.range(0, 70).mapToObj(i -> "a" + i).toList();
+    var match = population.match(STATE, actions, true, Set.of());
+    population.sampledDeletion(true);
+
+    assertThatThrownBy(
+            () ->
+                population.match(STATE, List.of("new"), true, Set.copyOf(match.matchingRuleIds())))
+        .isInstanceOf(XcsCapacityException.class);
+
+    assertThat(population.snapshots()).hasSize(70);
+    assertThat(population.eventsAfter(0, 100))
+        .noneMatch(event -> event.type() == XcsEvolutionEvent.Type.DELETED);
+  }
+
+  @Test
+  void sampledCoveringCountsOnlyExcessNumerosityOnProtectedRules() {
+    var population = new XcsPopulation(parameters(70, 0, 0.0, 0.0, 0.0, 0.01), new Random(11));
+    var actions = java.util.stream.IntStream.range(0, 70).mapToObj(i -> "a" + i).toList();
+    var match = population.match(STATE, actions, true, Set.of());
+    var protectedId = match.actionRuleIds().get("a0").getFirst();
+    population.sampledDeletion(true);
+    population.advanceIteration();
+    population.runGeneticAlgorithm(List.of(protectedId), STATE, actions, Set.of());
+
+    assertThat(population.snapshot(protectedId).orElseThrow().numerosity()).isEqualTo(3);
+    var beforeInsufficientCover = population.snapshots();
+    var everyRuleProtected = beforeInsufficientCover.stream().map(XcsRuleSnapshot::id).toList();
+
+    assertThatThrownBy(
+            () ->
+                population.match(
+                    STATE,
+                    List.of("new-1", "new-2", "new-3"),
+                    true,
+                    Set.copyOf(everyRuleProtected)))
+        .isInstanceOf(XcsCapacityException.class);
+
+    assertThat(population.snapshots()).isEqualTo(beforeInsufficientCover);
   }
 
   private static XcsParameters parameters(

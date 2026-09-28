@@ -115,4 +115,15 @@ public class PopulationBenchmark {
     return ((ReferenceXcsPopulation) population)
         .match(PopulationFixture.STATE, action, true, Set.of());
   }
+
+  @Benchmark
+  public Object sampledCoveringAtCapacity() {
+    var action = List.of("sampled-new" + nextAction++);
+    if (population instanceof XcsPopulation optimized) {
+      optimized.sampledDeletion(true);
+      return optimized.match(PopulationFixture.STATE, action, true, Set.of());
+    }
+    return ((ReferenceXcsPopulation) population)
+        .match(PopulationFixture.STATE, action, true, Set.of());
+  }
 }
