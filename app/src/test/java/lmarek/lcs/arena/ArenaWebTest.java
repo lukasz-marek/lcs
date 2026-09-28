@@ -28,7 +28,12 @@ class ArenaWebTest {
       assertThat(options.statusCode()).isEqualTo(200);
       assertThat(options.body())
           .contains(
-              "XCS", "MCTS", "RANDOM", "\"matchingWorkers\":1", "\"parallelThreshold\":32768");
+              "XCS",
+              "MCTS",
+              "RANDOM",
+              "\"matchingWorkers\":1",
+              "\"learningWorkers\":16",
+              "\"parallelThreshold\":32768");
 
       var beforeRun = send(client, "GET", "/api/arena/runs/current", null);
       assertThat(beforeRun.statusCode()).isEqualTo(404);
@@ -52,6 +57,42 @@ class ArenaWebTest {
       assertThat(started.statusCode()).isEqualTo(201);
       assertThat(started.body()).contains("RUNNING", "\"seed\":\"9223372036854775807\"");
       assertThat(send(client, "POST", "/api/arena/runs", request).statusCode()).isEqualTo(409);
+
+      var mapper = new tools.jackson.databind.ObjectMapper();
+      var full = mapper.readTree(send(client, "GET", "/api/arena/runs/current", null).body());
+      var live = mapper.readTree(send(client, "GET", "/api/arena/runs/current/live", null).body());
+      assertThat(live.has("charts")).isFalse();
+      assertThat(live.has("recentReplays")).isFalse();
+      assertThat(live.has("evolutionHighlights")).isFalse();
+      assertThat(live.has("historyRevisions")).isTrue();
+      var historyPath = "/api/arena/runs/current/history?runId=" + full.get("runId").asText();
+      var history = mapper.readTree(send(client, "GET", historyPath, null).body());
+      assertThat(history.has("charts")).isTrue();
+      assertThat(history.has("recentReplays")).isTrue();
+      assertThat(history.has("evolutionHighlights")).isTrue();
+      var versions = history.get("historyRevisions");
+      var unchangedPath =
+          historyPath
+              + "&charts="
+              + versions.get("charts").asLong()
+              + "&replays="
+              + versions.get("replays").asLong()
+              + "&evolution="
+              + versions.get("evolution").asLong();
+      var unchanged = mapper.readTree(send(client, "GET", unchangedPath, null).body());
+      assertThat(unchanged.has("charts")).isFalse();
+      assertThat(unchanged.has("recentReplays")).isFalse();
+      assertThat(unchanged.has("evolutionHighlights")).isFalse();
+      var replaced =
+          mapper.readTree(
+              send(
+                      client,
+                      "GET",
+                      unchangedPath.replace(full.get("runId").asText(), "old-run"),
+                      null)
+                  .body());
+      assertThat(replaced.has("charts")).isTrue();
+      assertThat(replaced.has("recentReplays")).isTrue();
 
       var events =
           client.send(

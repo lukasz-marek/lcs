@@ -31,6 +31,12 @@ const state = {
   refreshInFlight: false,
   refreshQueued: false,
   renderPending: false,
+  fullRenderPending: false,
+  history: { charts: {}, recentReplays: [], evolutionHighlights: [] },
+  historyRevisions: { charts: -1, replays: -1, evolution: -1 },
+  historyRequest: null,
+  historyRetryTimer: null,
+  rendered: {},
   epoch: 0,
   startPending: false,
   startToken: 0,
@@ -346,10 +352,63 @@ function acceptSnapshot(snapshot) {
   }
   if (!current || current.runId !== snapshot.runId) resetForRun();
   state.snapshot = snapshot;
+  acceptHistory(snapshot);
+  queueHistoryRefresh();
   syncSnapshotPacing();
   scheduleRender();
   ensureEvents();
   return true;
+}
+
+const HISTORY_SECTIONS = {
+  charts: "charts",
+  replays: "recentReplays",
+  evolution: "evolutionHighlights",
+};
+
+function acceptHistory(response) {
+  if (response.runId !== state.snapshot?.runId || !response.historyRevisions) return;
+  for (const [section, field] of Object.entries(HISTORY_SECTIONS)) {
+    if (response[field] != null &&
+        compareRevision(response.historyRevisions[section], state.historyRevisions[section]) >= 0) {
+      if (compareRevision(response.historyRevisions[section], state.historyRevisions[section]) > 0) {
+        state.history[field] = response[field];
+      }
+      state.historyRevisions[section] = response.historyRevisions[section];
+    }
+  }
+}
+
+function queueHistoryRefresh() {
+  const snapshot = state.snapshot;
+  if (!snapshot?.historyRevisions || state.historyRequest) return;
+  const changed = Object.keys(HISTORY_SECTIONS).some((section) =>
+    compareRevision(snapshot.historyRevisions[section], state.historyRevisions[section]) > 0);
+  if (!changed) return;
+  clearTimeout(state.historyRetryTimer);
+  const request = { epoch: state.epoch, runId: snapshot.runId };
+  state.historyRequest = request;
+  const params = new URLSearchParams({ runId: request.runId, ...state.historyRevisions });
+  let failed = false;
+  json(`/api/arena/runs/current/history?${params}`)
+    .then((response) => {
+      if (request !== state.historyRequest || request.epoch !== state.epoch) return;
+      if (response.runId !== request.runId) {
+        failed = true;
+        queueSnapshotRefresh();
+        return;
+      }
+      acceptHistory(response);
+      scheduleRender();
+    })
+    .catch(() => { failed = true; })
+    .finally(() => {
+      if (request !== state.historyRequest) return;
+      state.historyRequest = null;
+      // Retry even after a terminal update, when no further SSE notification will arrive.
+      if (failed) state.historyRetryTimer = setTimeout(queueHistoryRefresh, 1000);
+      else queueHistoryRefresh();
+    });
 }
 
 function queueSnapshotRefresh(source = null) {
@@ -362,7 +421,7 @@ function queueSnapshotRefresh(source = null) {
   state.refreshInFlight = true;
   const epoch = state.epoch;
   const sourceAtStart = source;
-  json("/api/arena/runs/current")
+  json("/api/arena/runs/current/live")
     .then((snapshot) => {
       if (epoch !== state.epoch) return;
       if (sourceAtStart && sourceAtStart !== state.source) return;
@@ -441,6 +500,11 @@ function resetForRun() {
   disconnectEvents();
   clearReplayTimer();
   state.snapshot = null;
+  clearTimeout(state.historyRetryTimer);
+  state.historyRequest = null;
+  state.history = { charts: {}, recentReplays: [], evolutionHighlights: [] };
+  state.historyRevisions = { charts: -1, replays: -1, evolution: -1 };
+  state.rendered = {};
   state.replay = null;
   state.replayGameNumber = null;
   state.replayPly = 0;
@@ -477,12 +541,16 @@ function clearRunUi() {
   updateReplayControls();
 }
 
-function scheduleRender() {
+function scheduleRender(full = true) {
+  state.fullRenderPending ||= full;
   if (state.renderPending) return;
   state.renderPending = true;
   requestAnimationFrame(() => {
     state.renderPending = false;
-    render();
+    const full = state.fullRenderPending;
+    state.fullRenderPending = false;
+    if (full) render();
+    else if (state.viewMode === "REPLAY") renderReplayGame();
   });
 }
 
@@ -629,10 +697,23 @@ function render() {
       : `${snapshot.statistics.gamesPerSecond.toFixed(1)} g/s`,
   );
 
-  renderCompetitorSelector(snapshot.competitors || []);
-  renderChart();
-  renderReplayPicker(snapshot.recentReplays || []);
-  renderEvolution(snapshot.evolutionHighlights || []);
+  const competitorKey = JSON.stringify(snapshot.competitors || []);
+  if (state.rendered.competitors !== competitorKey) {
+    renderCompetitorSelector(snapshot.competitors || []);
+    state.rendered.competitors = competitorKey;
+  }
+  if (state.rendered.charts !== state.history.charts) renderChart();
+  const replaySelection = `${state.viewMode}:${state.replayGameNumber}`;
+  if (state.rendered.replays !== state.history.recentReplays ||
+      state.rendered.replaySelection !== replaySelection) {
+    renderReplayPicker(state.history.recentReplays);
+    state.rendered.replays = state.history.recentReplays;
+    state.rendered.replaySelection = replaySelection;
+  }
+  if (state.rendered.evolution !== state.history.evolutionHighlights) {
+    renderEvolution(state.history.evolutionHighlights);
+    state.rendered.evolution = state.history.evolutionHighlights;
+  }
   const population = Object.values(snapshot.telemetry || {}).reduce(
     (total, telemetry) => total + Number(telemetry?.["xcs.population.micro"] || 0),
     0,
@@ -790,7 +871,8 @@ function drawLines(series) {
 }
 
 function renderChart() {
-  const data = state.snapshot?.charts?.[state.chart] || {};
+  const data = state.history.charts[state.chart] || {};
+  state.rendered.charts = state.history.charts;
   document.querySelector("#learning-metric-label").hidden = state.chart !== "learning";
   const metric = document.querySelector("#learning-metric").value;
   const series = Object.entries(data)
@@ -1063,7 +1145,7 @@ function renderReplayGame() {
 function setReplayPly(ply) {
   if (!state.replay) return;
   state.replayPly = Math.max(0, Math.min(state.replay.turns.length, ply));
-  scheduleRender();
+  scheduleRender(false);
 }
 
 function updateReplayControls() {
@@ -1092,7 +1174,7 @@ function toggleReplayPlayback() {
       return;
     }
     state.replayPly += 1;
-    scheduleRender();
+    scheduleRender(false);
   }, 350);
 }
 

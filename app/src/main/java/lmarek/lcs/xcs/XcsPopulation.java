@@ -180,47 +180,52 @@ final class XcsPopulation {
     if (actionSet.isEmpty()) {
       return;
     }
-    var before = new LinkedHashMap<Rule, RuleMetrics>();
-    actionSet.forEach(rule -> before.put(rule, RuleMetrics.from(rule)));
+    var before = new RuleMetrics[actionSet.size()];
+    var predictions = new double[actionSet.size()];
+    var errors = new double[actionSet.size()];
+    var sizes = new double[actionSet.size()];
+    var accuracies = new double[actionSet.size()];
     var actionSetNumerosity = actionSet.stream().mapToInt(rule -> rule.numerosity).sum();
-    for (var rule : actionSet) {
-      var oldPrediction = rule.prediction;
-      var absoluteError = Math.abs(target - oldPrediction);
-      rule.experience++;
-      var learningRate =
-          rule.experience < 1.0 / parameters.beta() ? 1.0 / rule.experience : parameters.beta();
-      // Wilson's ordering matters: error is based on the prediction before this update.
-      rule.predictionError += learningRate * (absoluteError - rule.predictionError);
-      rule.prediction += learningRate * (target - oldPrediction);
-      rule.actionSetSize += learningRate * (actionSetNumerosity - rule.actionSetSize);
-    }
-
-    var accuracies = new LinkedHashMap<Rule, Double>();
+    // Workers only compute scratch values. Failed/cancelled calculations cannot partially update
+    // rules.
+    matchingExecutor.calculate(
+        actionSet.size(),
+        i -> {
+          var rule = actionSet.get(i);
+          before[i] = RuleMetrics.from(rule);
+          var experience = rule.experience + 1;
+          var learningRate =
+              experience < 1.0 / parameters.beta() ? 1.0 / experience : parameters.beta();
+          errors[i] =
+              rule.predictionError
+                  + learningRate * (Math.abs(target - rule.prediction) - rule.predictionError);
+          predictions[i] = rule.prediction + learningRate * (target - rule.prediction);
+          sizes[i] = rule.actionSetSize + learningRate * (actionSetNumerosity - rule.actionSetSize);
+          accuracies[i] =
+              errors[i] < parameters.errorThreshold()
+                  ? 1.0
+                  : parameters.accuracyAlpha()
+                      * Math.pow(
+                          errors[i] / parameters.errorThreshold(), -parameters.accuracyPower());
+        });
     var accuracySum = 0.0;
-    for (var rule : actionSet) {
-      var accuracy =
-          rule.predictionError < parameters.errorThreshold()
-              ? 1.0
-              : parameters.accuracyAlpha()
-                  * Math.pow(
-                      rule.predictionError / parameters.errorThreshold(),
-                      -parameters.accuracyPower());
-      accuracies.put(rule, accuracy);
-      accuracySum += accuracy * rule.numerosity;
+    for (int i = 0; i < actionSet.size(); i++) {
+      accuracySum += accuracies[i] * actionSet.get(i).numerosity;
     }
-    if (accuracySum > 0.0) {
-      for (var rule : actionSet) {
-        var relativeAccuracy = accuracies.getOrDefault(rule, 0.0) * rule.numerosity / accuracySum;
+    for (int i = 0; i < actionSet.size(); i++) {
+      var rule = actionSet.get(i);
+      var old = before[i];
+      rule.experience++;
+      rule.prediction = predictions[i];
+      rule.predictionError = errors[i];
+      rule.actionSetSize = sizes[i];
+      if (accuracySum > 0.0) {
+        var relativeAccuracy = accuracies[i] * rule.numerosity / accuracySum;
         rule.fitness += parameters.beta() * (relativeAccuracy - rule.fitness);
       }
-    }
-    for (var rule : actionSet) {
-      var old = before.get(rule);
-      if (old != null) {
-        errorSum += rule.predictionError - old.predictionError;
-        fitnessSum += rule.fitness - old.fitness;
-        retainRuleChange(rule.id, MetricChange.from(nextEventSequence++, iteration, rule, old));
-      }
+      errorSum += rule.predictionError - old.predictionError;
+      fitnessSum += rule.fitness - old.fitness;
+      retainRuleChange(rule.id, MetricChange.from(nextEventSequence++, iteration, rule, old));
     }
   }
 

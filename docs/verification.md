@@ -145,3 +145,8 @@ The jcstress quick run completed 84 configurations across progress publication a
 close/order tests with zero forbidden outcomes. It does not prove that no races exist. The regression
 suite and `spotlessCheck` pass. Run the full one-hour integrated soak and browser automation before
 release; parallel matching stays opt-in until its throughput gate passes on the target host.
+
+## Parallel learning
+
+See [the learning throughput report](learning-throughput.md) for worker configuration,
+repeatability and cancellation checks, full-game profiles, and benchmark reproduction commands.

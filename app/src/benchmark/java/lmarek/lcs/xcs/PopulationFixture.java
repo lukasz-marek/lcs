@@ -9,12 +9,52 @@ import java.util.SplittableRandom;
 /**
  * Reflection is confined to unmeasured fixture construction; production exposes no rule importer.
  */
-final class PopulationFixture {
+public final class PopulationFixture {
+  private PopulationFixture() {}
+
+  /** Seed sparse or dense classifiers for full-game population pressure measurements. */
+  public static void seedAgent(Object agent, int size, boolean dense)
+      throws ReflectiveOperationException {
+    var field = XcsAgent.class.getDeclaredField("population");
+    field.setAccessible(true);
+    var original = (XcsPopulation) field.get(agent);
+    var executor = XcsPopulation.class.getDeclaredField("matchingExecutor");
+    executor.setAccessible(true);
+    var game = new lmarek.lcs.draughts.DraughtsGame();
+    var encoder = new DraughtsXcsEncoder();
+    var initial = game.initialState();
+    var actionIds =
+        game.legalMoves(initial).stream()
+            .map(move -> encoder.actionId(move, lmarek.lcs.game.Player.WHITE))
+            .toList();
+    int attributes = encoder.encode(initial, lmarek.lcs.game.Player.WHITE).values().size();
+    var seeded =
+        (XcsPopulation)
+            (dense
+                ? create(false, size, actionIds.size(), 1, true, false, actionIds, attributes)
+                : create(false, size, 1000, 1, false, false));
+    seeded.matchingExecutor((MatchingExecutor) executor.get(original));
+    field.set(agent, seeded);
+  }
+
   static final CategoricalState STATE =
       new CategoricalState(java.util.Collections.nCopies(52, "0"));
 
   static Object create(
       boolean baseline, int size, int actions, int numerosity, boolean highMatch, boolean histories)
+      throws ReflectiveOperationException {
+    return create(baseline, size, actions, numerosity, highMatch, histories, List.of(), 52);
+  }
+
+  private static Object create(
+      boolean baseline,
+      int size,
+      int actions,
+      int numerosity,
+      boolean highMatch,
+      boolean histories,
+      List<String> actionIds,
+      int attributes)
       throws ReflectiveOperationException {
     var defaults = XcsParameters.defaults();
     var parameters =
@@ -63,10 +103,10 @@ final class PopulationFixture {
     int macroCount = size / numerosity;
     var ids = new ArrayList<Long>(macroCount);
     for (int i = 0; i < macroCount; i++) {
-      var values = new Object[52];
-      var terms = new ArrayList<Object>(52);
-      for (int j = 0; j < 52; j++) {
-        boolean any = highMatch && j < 51;
+      var values = new Object[attributes];
+      var terms = new ArrayList<Object>(attributes);
+      for (int j = 0; j < attributes; j++) {
+        boolean any = !actionIds.isEmpty() || (highMatch && j < 51);
         String value = j == 51 || ((i >>> (j % 20)) & 1) == 0 ? "0" : "1";
         if (baseline)
           terms.add(
@@ -78,7 +118,7 @@ final class PopulationFixture {
           ruleConstructor.newInstance(
               id,
               baseline ? terms : values,
-              "a" + (i % actions),
+              actionIds.isEmpty() ? "a" + (i % actions) : actionIds.get(i % actions),
               0.0,
               0.0,
               .01,

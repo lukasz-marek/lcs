@@ -42,6 +42,10 @@ public class PopulationBenchmark {
   @Param({"false", "true"})
   public boolean histories;
 
+  @Param({"1", "2", "4", "8", "15"})
+  public int workers;
+
+  private List<Long> updateIds;
   private Object population;
   private MatchingExecutor executor;
   private long nextAction;
@@ -52,8 +56,13 @@ public class PopulationBenchmark {
     population =
         PopulationFixture.create(
             implementation.equals("baseline"), size, actions, numerosity, highMatch, histories);
-    executor = new MatchingExecutor(implementation.equals("parallel") ? 15 : 1, 32_768);
+    executor =
+        new MatchingExecutor(
+            implementation.equals("parallel") ? workers : 1,
+            implementation.equals("parallel") ? workers : 1,
+            32_768);
     if (population instanceof XcsPopulation optimized) optimized.matchingExecutor(executor);
+    updateIds = java.util.stream.LongStream.rangeClosed(1, size / numerosity).boxed().toList();
     int legalCount = Math.max(1, actions / 20);
     legalActions =
         java.util.stream.IntStream.range(0, legalCount).mapToObj(index -> "a" + index).toList();
@@ -70,6 +79,13 @@ public class PopulationBenchmark {
       return optimized.match(PopulationFixture.STATE, legalActions, false, Set.of());
     return ((ReferenceXcsPopulation) population)
         .match(PopulationFixture.STATE, legalActions, false, Set.of());
+  }
+
+  @Benchmark
+  public void update() {
+    if (population instanceof XcsPopulation optimized)
+      optimized.update(updateIds, (double) (nextAction++ % 2));
+    else ((ReferenceXcsPopulation) population).update(updateIds, (double) (nextAction++ % 2));
   }
 
   @Benchmark

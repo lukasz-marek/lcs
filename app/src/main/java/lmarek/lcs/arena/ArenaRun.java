@@ -80,13 +80,17 @@ final class ArenaRun implements AutoCloseable {
     pacing = request.pacing();
     var rootSeeds = new SplittableRandom(request.parsedSeed());
     matchingExecutor =
-        new MatchingExecutor(performance.matchingWorkers(), performance.parallelThreshold());
+        new MatchingExecutor(
+            performance.matchingWorkers(),
+            performance.learningWorkers(),
+            performance.parallelThreshold());
     System.getLogger(ArenaRun.class.getName())
         .log(
             System.Logger.Level.INFO,
-            "Arena {0}: matching workers={1}, threshold={2}",
+            "Arena {0}: matching workers={1}, learning workers={2}, threshold={3}",
             id,
             performance.matchingWorkers(),
+            performance.learningWorkers(),
             performance.parallelThreshold());
     var factory = new DraughtsAgentFactory(game, matchingExecutor);
     agentA = factory.create("A", request.agentA(), rootSeeds.nextLong());
@@ -360,8 +364,8 @@ final class ArenaRun implements AutoCloseable {
   }
 
   private void publishGameProgress(boolean evaluation) {
-    captureProgress();
     if (!evaluation && pacing == Pacing.LIVE) {
+      captureProgress();
       publishNow(false);
     } else {
       publishProgress();
@@ -538,6 +542,7 @@ final class ArenaRun implements AutoCloseable {
         historyView.evolutionHighlights(),
         captured.telemetry(),
         historyView.charts(),
+        historyView.historyRevisions(),
         lastError);
   }
 

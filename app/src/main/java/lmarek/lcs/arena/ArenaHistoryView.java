@@ -9,7 +9,8 @@ record ArenaHistoryView(
     ArenaStatisticsView statistics,
     List<ReplaySummary> replaySummaries,
     List<EvolutionHighlight> evolutionHighlights,
-    Map<String, Map<String, List<ChartPoint>>> charts) {
+    Map<String, Map<String, List<ChartPoint>>> charts,
+    HistoryRevisions historyRevisions) {
   ArenaHistoryView {
     replaySummaries = List.copyOf(replaySummaries);
     evolutionHighlights = List.copyOf(evolutionHighlights);

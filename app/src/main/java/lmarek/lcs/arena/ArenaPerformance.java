@@ -1,11 +1,19 @@
 package lmarek.lcs.arena;
 
-/** Startup settings; parallel execution remains opt-in until measured release gates pass. */
-public record ArenaPerformance(int matchingWorkers, int parallelThreshold) {
+/** Startup worker settings for an arena run. */
+public record ArenaPerformance(int matchingWorkers, int learningWorkers, int parallelThreshold) {
+  public ArenaPerformance(int matchingWorkers, int parallelThreshold) {
+    this(matchingWorkers, 16, parallelThreshold);
+  }
+
   public ArenaPerformance {
-    if (matchingWorkers < 1 || matchingWorkers > 15 || parallelThreshold < 1) {
+    if (learningWorkers < 1
+        || learningWorkers > 16
+        || matchingWorkers < 1
+        || matchingWorkers > 15
+        || parallelThreshold < 1) {
       throw new IllegalArgumentException(
-          "arena.performance requires 1..15 matching workers and a positive parallel threshold");
+          "arena.performance requires 1..15 matching workers, 1..16 learning workers and a positive parallel threshold");
     }
   }
 

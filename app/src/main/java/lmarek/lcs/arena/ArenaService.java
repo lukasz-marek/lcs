@@ -14,8 +14,9 @@ public final class ArenaService {
 
   public ArenaService(
       @Value("${arena.performance.matching-workers:1}") int workers,
+      @Value("${arena.performance.learning-workers:16}") int learningWorkers,
       @Value("${arena.performance.parallel-threshold:32768}") int threshold) {
-    performance = new ArenaPerformance(workers, threshold);
+    performance = new ArenaPerformance(workers, learningWorkers, threshold);
   }
 
   public ArenaOptions options() {

@@ -24,6 +24,13 @@ final class ArenaHistory {
   private final Map<String, HierarchicalSeries> resultSeries = new LinkedHashMap<>();
   private final Map<String, HierarchicalSeries> learningSeries = new LinkedHashMap<>();
   private final Map<String, HierarchicalSeries> evaluationSeries = new LinkedHashMap<>();
+  private long chartsRevision;
+  private long replaysRevision;
+  private long evolutionRevision;
+  private @org.jspecify.annotations.Nullable Map<String, Map<String, List<ChartPoint>>>
+      cachedCharts;
+  private @org.jspecify.annotations.Nullable List<ReplaySummary> cachedReplays;
+  private @org.jspecify.annotations.Nullable List<EvolutionHighlight> cachedEvolution;
   private long trainingGames;
   private long evaluationGames;
   private long aWins;
@@ -45,6 +52,8 @@ final class ArenaHistory {
       GameOutcome outcome,
       Map<String, Double> telemetryA,
       Map<String, Double> telemetryB) {
+    chartsRevision++;
+    cachedCharts = null;
     trainingGames++;
     totalTrainingPlies += replay.turns().size();
     var result = resultForA(outcome, replay.whiteCompetitorId());
@@ -66,6 +75,8 @@ final class ArenaHistory {
   }
 
   synchronized void recordEvaluationSeries(long atTrainingGame, double aScore, double bScore) {
+    chartsRevision++;
+    cachedCharts = null;
     series(evaluationSeries, "A score").add(atTrainingGame, aScore);
     series(evaluationSeries, "B score").add(atTrainingGame, bScore);
   }
@@ -76,6 +87,8 @@ final class ArenaHistory {
   }
 
   synchronized void addEvolution(EvolutionHighlight highlight) {
+    evolutionRevision++;
+    cachedEvolution = null;
     evolution.addLast(highlight);
     while (evolution.size() > MAX_EVOLUTION_EVENTS) {
       evolution.removeFirst();
@@ -108,7 +121,9 @@ final class ArenaHistory {
   }
 
   synchronized List<ReplaySummary> replaySummaries() {
-    return replays.stream().map(ReplaySummary::from).toList();
+    if (cachedReplays == null)
+      cachedReplays = List.copyOf(replays.stream().map(ReplaySummary::from).toList());
+    return cachedReplays;
   }
 
   synchronized GameReplay replay(long gameNumber) {
@@ -119,14 +134,18 @@ final class ArenaHistory {
   }
 
   synchronized List<EvolutionHighlight> evolutionHighlights() {
-    return List.copyOf(evolution);
+    if (cachedEvolution == null) cachedEvolution = List.copyOf(evolution);
+    return cachedEvolution;
   }
 
   synchronized Map<String, Map<String, List<ChartPoint>>> charts() {
-    return Map.of(
-        "results", points(resultSeries),
-        "learning", points(learningSeries),
-        "evaluation", points(evaluationSeries));
+    if (cachedCharts == null)
+      cachedCharts =
+          Map.of(
+              "results", points(resultSeries),
+              "learning", points(learningSeries),
+              "evaluation", points(evaluationSeries));
+    return cachedCharts;
   }
 
   synchronized ArenaHistoryView view() {
@@ -136,7 +155,8 @@ final class ArenaHistory {
         statistics(),
         replaySummaries(),
         evolutionHighlights(),
-        charts());
+        charts(),
+        new HistoryRevisions(chartsRevision, replaysRevision, evolutionRevision));
   }
 
   private void recordLearning(String competitor, Map<String, Double> telemetry) {
@@ -155,6 +175,8 @@ final class ArenaHistory {
   }
 
   private void retainReplay(GameReplay replay) {
+    replaysRevision++;
+    cachedReplays = null;
     replays.addLast(replay);
     while (replays.size() > MAX_REPLAYS) {
       replays.removeFirst();

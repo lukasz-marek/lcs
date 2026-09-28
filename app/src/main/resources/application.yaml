@@ -7,5 +7,6 @@ spring:
     name: "lcs-spectator-arena"
 arena:
   performance:
+    learning-workers: "${ARENA_PERFORMANCE_LEARNING_WORKERS:16}"
     matching-workers: "${ARENA_PERFORMANCE_MATCHING_WORKERS:1}"
     parallel-threshold: "${ARENA_PERFORMANCE_PARALLEL_THRESHOLD:32768}"

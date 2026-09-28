@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -37,6 +38,20 @@ public final class ArenaController {
   @GetMapping("/runs/current")
   ArenaSnapshot current() {
     return arena.snapshot();
+  }
+
+  @GetMapping("/runs/current/live")
+  ArenaLiveSnapshot live() {
+    return ArenaLiveSnapshot.from(arena.snapshot());
+  }
+
+  @GetMapping("/runs/current/history")
+  ArenaHistoryResponse history(
+      @RequestParam(defaultValue = "") String runId,
+      @RequestParam(defaultValue = "-1") long charts,
+      @RequestParam(defaultValue = "-1") long replays,
+      @RequestParam(defaultValue = "-1") long evolution) {
+    return ArenaHistoryResponse.from(arena.snapshot(), runId, charts, replays, evolution);
   }
 
   @PostMapping("/runs/current/pause")
